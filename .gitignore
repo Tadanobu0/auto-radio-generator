@@ -47,7 +47,6 @@ coverage.xml
 .pytest_cache/
 
 # Virtual environments
-.env
 .venv/
 venv/
 venv_py313/
@@ -111,9 +110,16 @@ desktop.ini
 # User settings
 user_settings.json
 
-# YouTube OAuth secrets
+# Secrets (API keys, YouTube OAuth)
+.env
+.env.*
+!.env.example
 client_secret.json
-token.json
+token*
+credentials*.json
+
+# Claude Code local settings (per machine)
+.claude/settings.local.json
 
 # =============================================================================
 # Media files (generated content)
