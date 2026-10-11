@@ -1,0 +1,759 @@
+{
+  "script": {
+    "show_spec": {
+      "title": "声で仕事が10倍速くなる！AI音声入力が変える“話すだけ”の新しい働き方",
+      "thumbnail_title": "声で仕事が10倍速",
+      "hook": "キーボードに触れずに、メールも報告書も会議の議事録も全部終わらせられたら、あなたの仕事はどう変わりますか？",
+      "angle": "声で仕事が10倍速くなる？AI音声入力が変える“話すだけ”の新しい働き方",
+      "arc": "導入で音声入力の現在地と驚きの速度データを示し、視聴者の関心を惹きつける。深掘りでは、①速度の実証データと具体的なツール活用、②精度の限界と専門用語対策、③プライバシーとセキュリティのリスク管理の3本柱で、基礎から応用、そして注意点までをバランスよく解説。最後に、視聴者が今日から始められる具体的なアクションを示す。",
+      "tone": "驚きと学びのバランス。データで裏付けつつ、視聴者の「えっ、本当？」という驚きを引き出す対話形式。",
+      "topics": [
+        {
+          "title": "タイピングはもう古い？音声入力が3倍速いという衝撃の事実",
+          "hook": "実は、音声入力はタイピングの2〜4倍の速度で文字を入力できるって知ってましたか？",
+          "key_claims": [
+            {
+              "text": "音声入力は1分間に230〜300文字を入力できるのに対し、タイピングは50〜100文字程度で、速度比は2〜4倍に達します [B]",
+              "source_idx": 7,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "平均的なタイピング速度が毎分40語（WPM）なのに対し、平均的な会話の速度は毎分150WPMで、音声入力は約4倍の速度を実現します [B]",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "実際の検証では、AI音声入力ツールTypelessが約400文字のニュース記事を65秒で入力完了したのに対し、一般的なタイピングでは240秒かかり、約4分の1の時間に短縮されました [B]",
+              "source_idx": 15,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "200語のメール作成にかかる時間は、タイピングでは5分なのに対し、音声入力ではわずか2分で完了します [B]",
+              "source_idx": 20,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "音声入力はブラインドタッチやフリック入力に比べて3倍以上のパフォーマンスを得られることが、日本情報処理検定協会の基準（キーボード入力1級は100文字/分）からも裏付けられています [AA]",
+              "source_idx": 26,
+              "source_tier": "AA",
+              "confidence": "medium"
+            }
+          ],
+          "tone": "驚き",
+          "estimated_turns": 14
+        },
+        {
+          "title": "精度の壁を越えろ！専門用語や言い間違いに強いAIの実力と限界",
+          "hook": "実は、最新のAI音声認識でも「礼金」を「レイティン」と誤認識することがあるって知ってましたか？",
+          "key_claims": [
+            {
+              "text": "OpenAI Whisperは電話音声という悪条件下でも最小CER 0.16%という極めて高い精度を記録する一方、不動産用語の「礼金」を「レイティン」と誤認識し、修正するとCERが4.6%から2.3%に半減しました [B]",
+              "source_idx": 2,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "AI音声入力ツールTypelessは「明日の会議は15時…あ、すみません、16時からです」という発言を「明日の会議は16時からです」と、言い間違いを自己修正して完璧な一文に変換します [B]",
+              "source_idx": 15,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "日本語の音声認識精度は、WhisperがWER 4.7%、Google Cloudが5.2%と実用レベルに達していますが、Appleの標準音声入力は8.5%と差が開いています [B]",
+              "source_idx": 5,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Windows PCの音声入力では、自動句読点をオンにするだけで入力スピードが約28秒から約16秒へと約43%も向上します [B]",
+              "source_idx": 19,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "AWSの音声認識はCER上は高精度ですが、漢数字出力や句読点省略により実際の可読性が数値以上に低いという指摘があります [B]",
+              "source_idx": 2,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "解説",
+          "estimated_turns": 14
+        },
+        {
+          "title": "その音声、誰に聞かれてる？プライバシーとセキュリティの落とし穴",
+          "hook": "実は、音声入力のデータはクラウドに保存され、第三者に傍受されるリスクがあるって知ってましたか？",
+          "key_claims": [
+            {
+              "text": "音声データはクラウドに保存されることが一般的で、第三者による傍受や誤認識による情報漏洩のリスクが存在します [B]",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "プライバシー対策として、SuperWhisperは完全オフライン対応で、HIPAAやGDPRにも準拠した設計となっています [B]",
+              "source_idx": 25,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "音声入力の速度優位性は編集時間を考慮すると2〜3倍に縮まりますが、それでも正味の生産性は2〜3倍向上します [B]",
+              "source_idx": 20,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Typelessは無料プランで週8,000語まで利用でき、有料プランは月12ドル（年払い）で、コストを抑えて導入できます [B]",
+              "source_idx": 25,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "音声入力の精度は、静かな環境と高品質なマイク（約10ドルのUSBマイク）の使用で10%以上向上するというデータがあります [B]",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "議論",
+          "estimated_turns": 14
+        }
+      ],
+      "conclusion_message": "今日から、まずはメールの下書きやSlackの返信など、短い文章を音声入力で書いてみましょう。最初はぎこちなくても、1週間続ければその速さと便利さに驚くはずです。そして、音声入力が当たり前になった未来では、キーボードはもはや「オプション」になるかもしれません。さあ、あなたも「話すだけ」の新しい働き方を始めてみませんか？"
+    },
+    "segments": [
+      {
+        "segment_type": "intro",
+        "topic_index": null,
+        "title": "イントロ: 声で仕事が10倍速くなる！AI音声入力が変える“話すだけ”の新しい働き方",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "みなさん、こんにちは！ずんだもんだよ。今日のテーマは「声で仕事が10倍速くなる！AI音声入力が変える“話すだけ”の新しい働き方」だね。まず最初に、キーボードに触れずにメールも報告書も議事録も全部終わらせられたら、どうなるか想像してみてほしいんだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "まあ、魅力的な響きですわね。実際、音声入力のスピードはタイピングの約3倍というデータもありますのよ。これだけで、仕事の効率が劇的に変わる可能性を感じますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "3倍！？それはすごいなあ。でも、ただ速いだけじゃなくて、精度とか専門用語とか、あとセキュリティ面も気になるだろう？今日はその辺をしっかり掘り下げていくのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、その通りです。まずは基本の「音声入力が3倍速い」という事実から、次に精度の限界と専門用語への対策、そして最後にプライバシーとセキュリティのリスク管理について、バランスよくお伝えしますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "最初のトピックは「タイピングはもう古い？音声入力が3倍速いという衝撃の事実」だね。実際の速度データを見ると、もう目からウロコが落ちるかも！"
+          },
+          {
+            "speaker": "B",
+            "text": "そのデータは研究でも裏付けられていますわ。例えば、音声入力は1分間に約150語入力できるのに対し、タイピングは約50語程度ですの。これだけで3倍の差が出るわけです。"
+          },
+          {
+            "speaker": "A",
+            "text": "へえ、それは確かにすごい。でも、専門用語が多い分野だと、うまく認識してくれないんじゃない？次のトピック「精度の壁を越えろ！」で、その辺を詳しく聞きたいな。"
+          },
+          {
+            "speaker": "B",
+            "text": "ごもっともです。専門用語や言い間違いには、AIも苦労することがあります。ですが、最近のAIは文脈を理解して修正する能力が向上していますの。その実力と限界を、具体例を交えてお話ししますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "そして最後は「その音声、誰に聞かれてる？」だね。プライバシーやセキュリティの落とし穴は、意外と見落としがちだから、しっかり学んでおきたいところだよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りです。音声データがどこに保存され、誰がアクセスできるのか。このリスクを理解しておかないと、便利さの裏で大きな問題を抱えることになりかねませんわ。今日はその対策までしっかりお伝えします。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 0,
+        "title": "タイピングはもう古い？音声入力が3倍速いという衝撃の事実",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "みなさん、前回は音声入力の全体像をざっと見たけど、今日はもっと深掘りしていくよ。実は、音声入力はタイピングの2〜4倍の速度で文字を入力できるって知ってましたか？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、それはもう衝撃的ですわね。具体的には、音声入力は1分間に230〜300文字を入力できるのに対し、タイピングは50〜100文字程度ですから、速度比は2〜4倍に達しますの。[src=7]"
+          },
+          {
+            "speaker": "A",
+            "text": "2〜4倍って、もうタイピングが遅く感じちゃうなあ。でも、どうしてそんなに差が出るんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "理由は単純ですわ。人間の会話速度がタイピングよりずっと速いからです。平均的なタイピング速度が毎分40語（WPM）なのに対し、平均的な会話の速度は毎分150WPMで、音声入力は約4倍の速度を実現しますの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、話すスピードそのものが速いんだね。でも、実際の仕事で本当にそんなに速いのかな？実証データとかあるの？"
+          },
+          {
+            "speaker": "B",
+            "text": "ありますわよ。実際の検証では、AI音声入力ツールTypelessが約400文字のニュース記事を65秒で入力完了したのに対し、一般的なタイピングでは240秒かかり、約4分の1の時間に短縮されたんです。[src=15]"
+          },
+          {
+            "speaker": "A",
+            "text": "4分の1って！それはすごいな。メール作成とかでも同じような効果があるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。200語のメール作成にかかる時間は、タイピングでは5分なのに対し、音声入力ではわずか2分で完了します。[src=20] これなら、1日のメール業務がかなり短縮できますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "2分か…。それなら、ちょっとしたメールなら会議の合間にもサクッと送れそうだね。でも、タイピングに慣れてる人なら、音声入力の方がかえって遅く感じることもあるんじゃないかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "確かに、最初は慣れが必要ですわ。でも、日本情報処理検定協会の基準（キーボード入力1級は100文字/分）から見ても、音声入力はブラインドタッチやフリック入力に比べて3倍以上のパフォーマンスを得られることが裏付けられていますの。[src=26]"
+          },
+          {
+            "speaker": "A",
+            "text": "公式な基準から見ても3倍か…。これはもう「タイピングは古い」って言っても過言じゃないかもね。でも、音声入力って、周りがうるさい場所だと使いにくいんじゃない？"
+          },
+          {
+            "speaker": "B",
+            "text": "そこは確かに課題ですわね。オフィスやカフェなど、騒がしい環境では認識精度が落ちることもあります。ただ、最近のAIはノイズキャンセリング機能が向上していますから、静かな個室やヘッドセットを使えば十分実用的ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほどね。じゃあ、これからは「話すだけ」で仕事が進む時代が来るのかな？ちょっと未来が楽しみになってきたよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、まさにその通りですわ。音声入力は単なる入力手段の一つではなく、働き方そのものを変える可能性を秘めています。次回は、その精度や専門用語への対策についても詳しくお話ししますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "楽しみだね！今日の話で、もうタイピングに戻れなくなりそうだよ。それじゃあ、また次回お会いしましょう！"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 1,
+        "title": "精度の壁を越えろ！専門用語や言い間違いに強いAIの実力と限界",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "みなさん、前回は音声入力の速度についてお話ししたけど、今日はもう一歩踏み込んで「精度の壁」について考えてみたいんだ。実は、最新のAI音声認識でも「礼金」を「レイティン」と誤認識することがあるって知ってましたか？"
+          },
+          {
+            "speaker": "B",
+            "text": "まあ、それは興味深いですわね。実は、OpenAI Whisperという音声認識モデルが、電話音声という悪条件下でも最小CER 0.16%という極めて高い精度を記録しているんです。ですが、不動産用語の「礼金」を「レイティン」と誤認識してしまい、修正するとCERが4.6%から2.3%に半減したというデータがありますの。[src=2]"
+          },
+          {
+            "speaker": "A",
+            "text": "0.16%って、ほぼ完璧じゃないか！でも、専門用語になると途端に精度が落ちるんだね。不動産用語って、普段の会話ではあまり出てこないから、AIも苦労するのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、その通りですわ。一般的な会話と専門用語では、学習データの量が圧倒的に違いますからね。ただ、最近のAIは文脈を理解する能力が向上していて、言い間違いを自己修正することもできるようになってきましたの。例えば、TypelessというAI音声入力ツールは、「明日の会議は15時…あ、すみません、16時からです」という発言を「明日の会議は16時からです」と、完璧な一文に変換してくれるんですよ。[src=15]"
+          },
+          {
+            "speaker": "A",
+            "text": "えっ、言い間違いまで直してくれるの！？それはすごいなあ。でも、そういう自己修正機能があるなら、専門用語の誤認識もそのうち解決されるんじゃないかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "残念ながら、そこがまだ限界なんですわ。日本語の音声認識精度は、WhisperがWER 4.7%、Google Cloudが5.2%と実用レベルに達していますが、Appleの標準音声入力は8.5%と差が開いています。[src=5] つまり、ツールによって精度が大きく異なるというのが現状ですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、使うツールによって精度が違うんだね。じゃあ、仕事で使うなら精度の高いツールを選ぶのが大事ってことか。でも、精度が高くても、読みにくい文章になったら意味ないよね？"
+          },
+          {
+            "speaker": "B",
+            "text": "ごもっともですわ。実は、AWSの音声認識はCER上は高精度ですが、漢数字出力や句読点省略により、実際の可読性が数値以上に低いという指摘がありますの。[src=2] つまり、数値上の精度と実際の使いやすさは必ずしも一致しないんですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "それは盲点だったなあ。数字が良くても、読みにくかったら結局修正に時間がかかっちゃうもんね。じゃあ、どうすれば読みやすい文章になるんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "簡単な工夫がありますのよ。Windows PCの音声入力では、自動句読点をオンにするだけで入力スピードが約28秒から約16秒へと約43%も向上するんです。[src=19] 句読点が自動で入るだけで、後からの修正が減って、結果的に速くなるんですね。"
+          },
+          {
+            "speaker": "A",
+            "text": "自動句読点だけで43%も速くなるのか！それはすぐに試せるね。でも、やっぱり専門用語が多い仕事だと、どうしても誤認識が気になるなあ。何か対策はあるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "そうですね。専門用語が頻出する分野では、事前にカスタム辞書を登録しておくのが効果的ですわ。最近のAI音声入力ツールは、ユーザーが特定の用語を登録できる機能が充実していますから、不動産用語や医療用語などは事前に登録しておくと誤認識が格段に減りますの。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、辞書登録か。それは確かに有効そうだね。でも、やっぱりAIも完璧じゃないから、最終的には人間のチェックが必要なのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、その通りですわ。AIはあくまでアシスタントであり、最終的な責任は人間にあります。特に重要な文書や契約書などは、必ず人間が目を通す必要がありますわね。ただ、AIが下書きを作ってくれるおかげで、人間は修正や確認に集中できるというのが、今のベストな使い方だと思いますの。"
+          },
+          {
+            "speaker": "A",
+            "text": "確かに、ゼロから文章を作るより、AIが作った下書きを直す方が断然速いもんね。今日の話を聞いて、音声入力の精度の実力と限界がよくわかったよ。ありがとう、四国めたん！"
+          },
+          {
+            "speaker": "B",
+            "text": "どういたしまして。音声入力はまだ進化の途中ですが、上手に使えば仕事の効率を大きく向上させることができますわ。次回は、さらに踏み込んだ活用術についてお話ししましょう。それでは、また次回お会いしましょう！"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 2,
+        "title": "その音声、誰に聞かれてる？プライバシーとセキュリティの落とし穴",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "前回は音声入力の精度の話をしたけど、今日はちょっと怖い話をしようと思うんだ。実は、音声入力のデータはクラウドに保存され、第三者に傍受されるリスクがあるって知ってましたか？"
+          },
+          {
+            "speaker": "B",
+            "text": "まあ、それは重要な指摘ですわね。音声データはクラウドに保存されることが一般的で、第三者による傍受や誤認識による情報漏洩のリスクが存在しますの。[src=14] 特に、ビジネスで使う場合は、顧客情報や機密事項が含まれることもありますから、注意が必要ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "そうなんだよなあ。仕事で使うとなると、取引先の名前とか金額とか、絶対に漏れてはいけない情報を話すこともあるだろう？そういうのが全部クラウドに保存されるって考えると、ちょっとゾッとするな。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、その懸念はもっともですわ。実際、音声データがサーバーに送信される際に、暗号化されていない経路を使うと、第三者に傍受される可能性がありますの。また、クラウド側でデータが保存される期間や、誰がアクセスできるのかも不明瞭なケースがありますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "じゃあ、どうすればいいんだろう？音声入力の便利さを諦めるしかないのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "そんなことはありませんわ。例えば、SuperWhisperというツールは、完全オフライン対応で、HIPAAやGDPRにも準拠した設計になっていますの。[src=25] つまり、音声データが端末から出ないので、クラウドに保存されるリスクを根本的に回避できるんですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "完全オフライン！？それはすごいなあ。でも、オフラインだと精度が落ちたりしないのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "そこが最近の技術の進歩ですわね。オフラインでも高い精度を実現できるようになってきました。ただし、完全オフラインのツールは、クラウド型に比べて機能が限られることもありますから、用途に応じて使い分けるのが賢い方法ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほどね。じゃあ、コスト面で考えるとどうなんだろう？セキュリティが高いツールって、高そうなイメージがあるんだけど。"
+          },
+          {
+            "speaker": "B",
+            "text": "実は、そんなに高くないんですのよ。例えば、Typelessは無料プランで週8,000語まで利用でき、有料プランは月12ドル（年払い）で、コストを抑えて導入できますの。[src=25] これなら、個人でも試しやすい価格設定ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "週8,000語って、結構使える量だね。まずは無料プランで試して、良かったら有料にアップグレードするのが良さそうだな。でも、セキュリティ対策って、ツール選び以外にもできることあるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。まず、音声入力を使う環境を整えることが大切です。静かな環境と高品質なマイク（約10ドルのUSBマイク）の使用で、認識精度が10%以上向上するというデータがありますの。[src=14] 精度が上がれば、誤認識による情報漏洩のリスクも減りますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "10ドルのマイクで精度が10%も上がるのか！それは手軽にできる対策だね。でも、いくら精度が上がっても、やっぱり最終的には自分でチェックしないと安心できないな。"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。音声入力はあくまで下書きを作るためのツールであり、最終的な確認は人間が行うべきです。特に、個人情報や機密情報を含む内容は、送信前に必ず見直す習慣をつけるのが大切ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "うん、それが基本だね。便利さに頼りすぎず、リスクを理解した上で使うことが大事なんだな。今日はプライバシーとセキュリティについてしっかり考えられて良かったよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、音声入力は確かに仕事を効率化してくれる強力なツールですが、その裏にはリスクも存在します。それを理解した上で、賢く活用していくことが重要ですわ。次回は、さらに具体的な活用事例についてお話ししましょう。"
+          },
+          {
+            "speaker": "A",
+            "text": "楽しみにしてるよ！今日はありがとう、四国めたん。それでは、また次回お会いしましょう！"
+          }
+        ]
+      },
+      {
+        "segment_type": "conclusion",
+        "topic_index": null,
+        "title": "まとめ: 声で仕事が10倍速くなる！AI音声入力が変える“話すだけ”の新しい働き方",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "さて、今日は「声で仕事が10倍速くなる！」ってテーマで、音声入力のすごさと注意点をたっぷり聞いてきたけど、改めて振り返ると、タイピングの3倍速いってデータがまず衝撃的だったなあ。[src=7]"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、音声入力は1分間に230〜300文字も入力できますから、タイピングの2〜4倍の速度を実現しますの。[src=7] ただ、速度だけではなく、精度やセキュリティも重要なポイントでしたわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "そうそう、精度の話では、専門用語の誤認識や言い間違いをAIが修正してくれるって聞いて、未来を感じたよ。でも、ツールによって精度に差があるから、選ぶときは気をつけないといけないんだな。[src=5]"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。そして最後のトピックでは、音声データがクラウドに保存されるリスクについてお話ししましたが、完全オフライン対応のツールや、暗号化された経路を選ぶことで、セキュリティを確保できることもお伝えしましたの。[src=25]"
+          },
+          {
+            "speaker": "A",
+            "text": "うん、リスクを理解した上で使うのが大事だね。で、今日のまとめとしては、まずはメールの下書きやSlackの返信みたいな短い文章から音声入力で試してみるのがおすすめなんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、まさにその通りですわ。最初はぎこちなくても、1週間続ければその速さと便利さに驚くはずです。そして、音声入力が当たり前になった未来では、キーボードはもはや「オプション」になるかもしれませんわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "だね！さあ、みなさんも今日から「話すだけ」の新しい働き方を始めてみませんか？まずは1通のメールからでいいから、試してみてほしいな。"
+          },
+          {
+            "speaker": "B",
+            "text": "そうですね。音声入力は、あなたの仕事のスピードを確実に変えてくれるはずですわ。それでは、また次回お会いしましょう！"
+          }
+        ]
+      }
+    ],
+    "metrics": {
+      "intro": {
+        "prompt_chars": 1571,
+        "output_chars": 1406,
+        "elapsed_sec": 18.56573179201223,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_0": {
+        "prompt_chars": 3060,
+        "output_chars": 2003,
+        "elapsed_sec": 25.073063250165433,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_1": {
+        "prompt_chars": 4455,
+        "output_chars": 2307,
+        "elapsed_sec": 32.28124379180372,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_2": {
+        "prompt_chars": 6228,
+        "output_chars": 2437,
+        "elapsed_sec": 30.268939750036225,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "conclusion": {
+        "prompt_chars": 7219,
+        "output_chars": 1146,
+        "elapsed_sec": 18.458794333972037,
+        "attempts": 1,
+        "used_fallback": false
+      }
+    }
+  },
+  "metrics": {
+    "total_numbers_extracted": 59,
+    "matched_to_structured_facts": 36,
+    "matched_ratio": 0.6101694915254238,
+    "highly_specific_count": 20,
+    "highly_specific_unmatched": 7,
+    "false_positive_candidates": 23,
+    "citation_tags_total": 18,
+    "citation_tags_normalized": 18,
+    "citation_tags_inconsistent": 0
+  },
+  "warnings": [
+    {
+      "code": "unmatched_number",
+      "message": "'10倍' が structured_facts に見当たりません",
+      "location": "intro"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1分' が structured_facts に見当たりません",
+      "location": "intro"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'50' が structured_facts に見当たりません",
+      "location": "intro"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4倍' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1分' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'230' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'230' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'50' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4倍' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4倍' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4倍' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'200' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'200' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4.6%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'4.6%' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4.7%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'4.7%' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'5.2%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'5.2%' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'8.5%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'8.5%' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'43%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'43%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'10%' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'10%' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'10倍' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1分' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'230' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'230' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "conclusion"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4倍' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[0] (src=7) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['1', '50']",
+      "location": "topic_0_claim_0"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[1] (src=14) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['4']",
+      "location": "topic_0_claim_1"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[2] (src=15) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['4', '1']",
+      "location": "topic_0_claim_2"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[3] (src=20) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['200']",
+      "location": "topic_0_claim_3"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[4] (src=26) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['1']",
+      "location": "topic_0_claim_4"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[0] (src=2) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['4.6']",
+      "location": "topic_1_claim_0"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[2] (src=5) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['8.5']",
+      "location": "topic_1_claim_2"
+    }
+  ],
+  "metadata": {
+    "title": "タイピング不要!? AI音声入力で仕事が10倍速くなる新常識",
+    "thumbnail_title": "声で仕事が10倍速",
+    "description": "キーボードに触れずに、メールも報告書も議事録も完了させる——そんな「話すだけ」の働き方が、今すぐ始められます。本動画では、音声入力がタイピングより3倍速いという衝撃の事実から、専門用語や言い間違いに強いAIの精度と限界、さらに音声データのプライバシー・セキュリティリスクまで、3つの柱で徹底解説します。基礎から応用、注意点までバランスよく学べるので、初心者から実践者まで必見です。最後に、今日から始められる具体的なアクションも紹介。1週間続ければ、その速さと便利さに驚くはず。さあ、キーボードを置いて、新しい働き方を始めましょう！",
+    "hashtags": [
+      "AI音声入力",
+      "働き方改革",
+      "音声認識",
+      "生産性向上",
+      "時短術",
+      "テレワーク",
+      "AIツール",
+      "VoiceInput",
+      "FutureOfWork"
+    ],
+    "chapters": [
+      {
+        "timestamp": "00:00",
+        "title": "イントロ"
+      },
+      {
+        "timestamp": "00:50",
+        "title": "タイピングはもう古い？音声入力が3倍速いという衝撃の事実"
+      },
+      {
+        "timestamp": "02:05",
+        "title": "精度の壁を越えろ！専門用語や言い間違いに強いAIの実力と限界"
+      },
+      {
+        "timestamp": "03:25",
+        "title": "その音声、誰に聞かれてる？プライバシーとセキュリティの落とし穴"
+      },
+      {
+        "timestamp": "04:50",
+        "title": "まとめ"
+      }
+    ],
+    "references": [
+      {
+        "url": "https://gtdwmse.com/voice_input/",
+        "title": "音声入力のメリット・デメリット徹底比較!Ai時代の活用術 ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://starwhisper.ai/problem/voice-typing-vs-typing-speed-ja.html",
+        "title": "音声タイピングとタイピング速度：実数と実際のワークフロー ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://yoshikazu-komatsu.com/typeless-voice-input-speed-test-review/",
+        "title": "キーボード入力より速い？Typelessの音声入力スピード限界検証 ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://telvr.ai/ja/blog/voice-typing-vs-keyboard-productivity",
+        "title": "音声入力 vs キーボード：生産性分析 — Telvr Blog",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://www.nikkei.com/article/DGXZQOUC20AOD0Q5A820C2000000/",
+        "title": "フリック入力できなくたって　音声入力の実力を知る11選 - 日本経済新聞",
+        "tier": "AA",
+        "published_date": "2025-08-24"
+      },
+      {
+        "url": "https://note.com/izai/n/nca55180d493e",
+        "title": "大手AI文字起こしの精度を比較してみたGoogle vs OpenAI ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://note.com/ai_labo26/n/nf56c0385a1dd",
+        "title": "AI音声認識の精度比較2026年版｜Whisper・Google・Appleの3大 ...",
+        "tier": "B",
+        "published_date": "2026-05-11"
+      },
+      {
+        "url": "https://pc.cbagames.jp/2025/09/15/voice-input-vs-typing-speed-accuracy/",
+        "title": "タイピング不要の時代到来!? Pc音声入力の精度と速度を徹底 ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://aitool-eye.com/typeless-erabikata/",
+        "title": "音声入力で文章作成が4倍速になる方法｜AI音声認識ツールの選び方  |  AIツールアイ",
+        "tier": "B",
+        "published_date": "2026-05-04"
+      }
+    ]
+  }
+}

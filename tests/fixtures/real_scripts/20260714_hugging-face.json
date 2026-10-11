@@ -1,0 +1,757 @@
+{
+  "script": {
+    "show_spec": {
+      "title": "AIの“GitHub”ことHugging Face、実は誰でも無料で遊べる“おもちゃ箱”だった！",
+      "thumbnail_title": "無料でAI遊び放題",
+      "hook": "「えーっ？あのChatGPTの裏側で動いてるAIモデルが、誰でも無料でダウンロードできて、しかもブラウザ上で遊べちゃうって本当ですか！？」",
+      "angle": "AIの“GitHub”とも言われるHugging Face、実は誰でも最先端AIを無料で試せる“遊び場”だった？その正体と使い道をラジオで解きほぐす。",
+      "arc": "導入で「AIのGitHub」というイメージを提示し、驚きを誘う。第1トピックでHugging Faceの全体像（モデルハブ・Transformersライブラリ・Spaces）を解説。第2トピックで「無料で遊べる具体例」として日本語モデルや画像生成デモを紹介。第3トピックで「品質管理の課題」という裏側を掘り下げ、まとめで「まずはSpacesで遊んでみよう」と視聴者のアクションを促す。",
+      "tone": "驚きと学びのバランス。A（ずんだもん）の「えーっ？」とB（めたん）の丁寧な解説で進行。",
+      "topics": [
+        {
+          "title": "Hugging Faceって何？AIの“GitHub”の正体",
+          "hook": "実は、Hugging Faceは単なるモデル置き場じゃなくて、誰でも無料でAIを動かせる“遊び場”だったんです。",
+          "key_claims": [
+            {
+              "text": "Hugging Faceは機械学習モデルやデータセットを共有するプラットフォームで、2025年時点でユーザー数は500万人以上、公開モデル数は100万個以上にのぼります [B]",
+              "source_idx": 22,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "中核ライブラリ「Transformers」は月間ダウンロード数が数億回を超え、たった数行のコードで最先端モデルを呼び出せます [B]",
+              "source_idx": 25,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "「Hugging Face Spaces」を使えば、GradioやStreamlitで作られたAIデモをブラウザ上で直接操作でき、コード不要で試せます [AA]",
+              "source_idx": 6,
+              "source_tier": "AA",
+              "confidence": "medium"
+            },
+            {
+              "text": "2024年9月時点で公開AIモデル数は119万381個、2022年4月のデータセット数670件から1万7000件以上に急増しました [B]",
+              "source_idx": 22,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "解説",
+          "estimated_turns": 14
+        },
+        {
+          "title": "日本語も画像も3Dも！無料で遊べる最先端AIの具体例",
+          "hook": "実は、日本語に特化した高性能モデルや、画像から3Dモデルを生成するデモが、誰でも無料で試せるんです。",
+          "key_claims": [
+            {
+              "text": "Liquid AIの「LFM2.5-1.2B-JP-202606」は12億パラメータと小規模ながら、日本語全般で最高水準のベンチマーク性能を発揮します [AA]",
+              "source_idx": 1,
+              "source_tier": "AA",
+              "confidence": "medium"
+            },
+            {
+              "text": "NVIDIAが開発した「NVIDIA-Nemotron-Nano-9B-v2-Japanese」は90億パラメータ、最大128Kトークンのコンテキスト長を持ち、推論時の思考トークン数をユーザーが指定可能です [AA]",
+              "source_idx": 3,
+              "source_tier": "AA",
+              "confidence": "medium"
+            },
+            {
+              "text": "Hugging Face Space「VAST-AI/TripoSplat」は単一画像から3Dガウシアンスプラットを生成し、「ideogram-ai/ideogram4」はテキストから画像を生成します [AA]",
+              "source_idx": 6,
+              "source_tier": "AA",
+              "confidence": "medium"
+            },
+            {
+              "text": "エージェントが2つのSpaceを呼び出すだけで、パリのモニュメントの3Dギャラリーを自動構築できた事例があります [AA]",
+              "source_idx": 6,
+              "source_tier": "AA",
+              "confidence": "medium"
+            }
+          ],
+          "tone": "驚き",
+          "estimated_turns": 14
+        },
+        {
+          "title": "無料の落とし穴？品質管理とセキュリティの課題",
+          "hook": "実は、誰でもアップロードできるHugging Faceには、悪意のあるコードが仕込まれたモデルや、情報不足のモデルカードが潜んでいるんです。",
+          "key_claims": [
+            {
+              "text": "Hugging Face上の一部のモデルに悪意のあるコードが埋め込まれているケースが確認されています [AAA]",
+              "source_idx": 10,
+              "source_tier": "AAA",
+              "confidence": "medium"
+            },
+            {
+              "text": "多くのモデルカードでデータセット、バイアス、ライセンス情報が不十分であることが指摘されています [AAA]",
+              "source_idx": 12,
+              "source_tier": "AAA",
+              "confidence": "medium"
+            },
+            {
+              "text": "多くのモデルが一度公開された後にほとんど更新されず、メンテナンスが不十分です [AAA]",
+              "source_idx": 16,
+              "source_tier": "AAA",
+              "confidence": "medium"
+            },
+            {
+              "text": "最初の100万モデル達成に約1,000日かかったのに対し、次の100万モデルは335日で達成され、成長速度が約65%短縮されました [B]",
+              "source_idx": 23,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "議論",
+          "estimated_turns": 14
+        }
+      ],
+      "conclusion_message": "まずはHugging Faceの「Spaces」にアクセスして、画像生成や日本語チャットを無料で試してみてください。遊びながら、AIの“今”を体感しましょう！"
+    },
+    "segments": [
+      {
+        "segment_type": "intro",
+        "topic_index": null,
+        "title": "イントロ: AIの“GitHub”ことHugging Face、実は誰でも無料で遊べる“おもちゃ箱”だった！",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "えーっ？あのChatGPTの裏側で動いてるAIモデルが、誰でも無料でダウンロードできて、しかもブラウザ上で遊べちゃうって本当ですか！？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、本当ですわよ。今日はまさにその「Hugging Face」というプラットフォームを取り上げます。AIの“GitHub”とも呼ばれる存在ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "Hugging Face…名前だけは聞いたことあるけど、正直「何だそれ？」って感じだね。GitHubみたいにコードを管理する場所じゃないんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。Hugging Faceは、誰でも最先端のAIモデルを無料で試せる“おもちゃ箱”のような存在。モデルハブ、Transformersライブラリ、そしてSpacesというデモ環境が三本柱ですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "おもちゃ箱って表現、ワクワクするなあ！でも、そんなすごいものが本当に無料で使えるの？例えば日本語のAIとか、画像生成とかも遊べるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。第1トピックで全体像を説明した後、第2トピックでは日本語モデルや画像生成、3Dモデルまで無料で触れる具体例をご紹介します。研究によると、Spacesだけで10万以上のデモが公開されていますのよ [src=1]。"
+          },
+          {
+            "speaker": "A",
+            "text": "10万以上！？それはすごい…でも、無料ってことは何か落とし穴もあるんじゃないかな。品質とかセキュリティ面、大丈夫なのだろうか？"
+          },
+          {
+            "speaker": "B",
+            "text": "さすが鋭いですわね。第3トピックでは、まさにその「品質管理とセキュリティの課題」という裏側を掘り下げます。誰でもアップロードできるからこそ、玉石混交なんですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど…最初は驚いたけど、ちゃんと課題もあるんだね。でもまずは「Spacesで遊んでみよう」ってのが番組のゴールみたいだし、私も早速試してみたいな！"
+          },
+          {
+            "speaker": "B",
+            "text": "その意気ですわ。それでは、AIの“GitHub”ことHugging Faceの世界へ、一緒に飛び込んでみましょう。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 0,
+        "title": "Hugging Faceって何？AIの“GitHub”の正体",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "前回の話で、Hugging Faceが無料でAIを試せるおもちゃ箱だって聞いて、すごく気になってるんだよね。でも、そもそも「Hugging Faceって何？」ってところから、もう少し深掘りしたいな。"
+          },
+          {
+            "speaker": "B",
+            "text": "良い質問ですわね。Hugging Faceは、機械学習モデルやデータセットを共有するプラットフォームで、2025年時点でユーザー数は500万人以上、公開モデル数は100万個以上にのぼりますの [src=22]。まさにAIの“GitHub”と呼ぶにふさわしい規模ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "500万人！？そんなに使ってる人がいるんだね。でも、ただモデルを置いてあるだけじゃなくて、何か特別な仕組みがあるんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。中核ライブラリ「Transformers」が鍵ですの。月間ダウンロード数が数億回を超えていて、たった数行のコードで最先端モデルを呼び出せます [src=25]。つまり、難しい設定なしに、すぐにAIを使い始められるんですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "数行のコードで最先端AIが動くって、すごすぎるよ！でも、コードを書くのが苦手な人でも遊べる方法ってあるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。それが「Hugging Face Spaces」という機能ですの。GradioやStreamlitで作られたAIデモをブラウザ上で直接操作でき、コード不要で試せます [src=6]。例えば、画像認識や文章生成を、ボタンを押すだけで体験できるんですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "えっ、ボタン一つで？それってまさに“遊び場”だね！でも、そんなに簡単に使えるなら、モデルの数もどんどん増えてるんじゃないかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "鋭いですわね。実際、2024年9月時点で公開AIモデル数は119万381個、2022年4月のデータセット数670件から1万7000件以上に急増しました [src=22]。たった2年で爆発的に増えているんですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "119万って…もう何が何だかわからない数だね。でも、そんなにたくさんあると、どれが本当に使えるのか迷っちゃうな。"
+          },
+          {
+            "speaker": "B",
+            "text": "そこは、コミュニティの評価やダウンロード数が参考になりますわね。ただし、誰でもアップロードできるので、品質にはばらつきがありますの。だからこそ、まずはSpacesで実際に動かしてみるのが一番ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、実際に触って確かめろってことか。それなら、初心者でも安心して試せるね。でも、無料でここまでできるって、Hugging Faceはどうやって儲けてるんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "企業向けの有料プランや、大規模な計算リソースの提供で収益を得ていますの。個人ユーザーは無料で十分遊べる設計ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、ビジネスモデルもちゃんとしてるんだね。じゃあ、私も早速Spacesで何か遊んでみようかな。おすすめのデモってある？"
+          },
+          {
+            "speaker": "B",
+            "text": "例えば、日本語の文章を自動で要約するデモや、写真をアップロードすると物体を認識してくれるデモが人気ですわ。どれもコードを書かずに試せますのよ。"
+          },
+          {
+            "speaker": "A",
+            "text": "おお、それは楽しそう！今日の話を聞いて、Hugging Faceがただのモデル置き場じゃなくて、誰でも最先端AIに触れられる“おもちゃ箱”だってことがよくわかったよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。ぜひ皆さんも、Hugging FaceのSpacesで、自分だけのAI体験をしてみてくださいね。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 1,
+        "title": "日本語も画像も3Dも！無料で遊べる最先端AIの具体例",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "前回、Hugging Faceの全体像を聞いて「おもちゃ箱」って表現がすごくしっくりきたんだよね。でも、具体的にどんなAIで遊べるのか、まだピンときてないんだ。例えば、日本語のAIって本当に無料で試せるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。実は、日本語に特化した高性能モデルや、画像から3Dモデルを生成するデモが、誰でも無料で試せるんです。まずは、Liquid AIが開発した「LFM2.5-1.2B-JP-202606」というモデルをご紹介しますね。これは12億パラメータと小規模ながら、日本語全般で最高水準のベンチマーク性能を発揮するそうですの [src=1]。"
+          },
+          {
+            "speaker": "A",
+            "text": "12億パラメータで小規模って言われても、もう桁が違いすぎてよくわからないけど…「日本語全般で最高水準」ってすごいね！でも、それってどうやって試すんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "Hugging Faceのモデルページに行けば、ブラウザ上で直接テキストを入力して応答を確認できる「推論ウィジェット」が付いていますの。コードを書かずに、日本語の質問を打ち込むだけで、AIがどんな返事をするか試せるんですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "へえ、ブラウザでポチポチするだけか。それなら私でもできそうだね！でも、もっと大きなモデルもあるんだろう？さっき「90億パラメータ」とか聞いた気がするけど…"
+          },
+          {
+            "speaker": "B",
+            "text": "よく覚えてらっしゃいますわね。NVIDIAが開発した「NVIDIA-Nemotron-Nano-9B-v2-Japanese」は90億パラメータ、最大128Kトークンのコンテキスト長を持ち、推論時の思考トークン数をユーザーが指定可能という、かなり高度なモデルですの [src=3]。"
+          },
+          {
+            "speaker": "A",
+            "text": "128Kトークンって、どれくらいの長さなんだろう…でも「思考トークン数を指定できる」って、AIに「もっと考えてね」って指示できるってこと？面白いね！"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。例えば、複雑な問題を解かせるときに、AIがどれだけ深く考えるかを調整できるんです。これもSpacesで無料で試せるデモが公開されていますのよ。"
+          },
+          {
+            "speaker": "A",
+            "text": "日本語モデルだけでもこんなにあるんだね。でも、トピックのタイトルには「画像も3Dも」ってあったけど、画像生成とかも遊べるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "もちろんですわ。Hugging Face Spaceには「ideogram-ai/ideogram4」というテキストから画像を生成するデモがありますの [src=6]。例えば「パリのエッフェル塔の上で踊る猫」と入力すれば、その画像を生成してくれますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "「パリのエッフェル塔の上で踊る猫」…想像しただけで笑えるけど、本当にそんな画像が出てくるんだろうか。でも、3Dモデルってどうやって生成するんだろう？画像から立体に変換するって、すごく難しそうだけど…"
+          },
+          {
+            "speaker": "B",
+            "text": "実は、それもSpacesで簡単に試せるんです。「VAST-AI/TripoSplat」というSpaceは、単一の画像から3Dガウシアンスプラットを生成してくれますの [src=6]。写真を1枚アップロードするだけで、立体モデルがブラウザ上でぐるぐる回せるんですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "えっ、1枚の写真から立体になるの！？それって、例えば自分の顔写真を入れたら3Dの顔ができちゃうってこと？すごいなあ…でも、こういうのって、複数のAIを組み合わせたりできるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "そこがHugging Faceの真骨頂ですわね。実際に、エージェントが2つのSpaceを呼び出すだけで、パリのモニュメントの3Dギャラリーを自動構築できた事例がありますの [src=6]。つまり、画像生成AIでモニュメントの画像を作り、その画像を3D変換AIに渡せば、自動で立体ギャラリーが完成するんです。"
+          },
+          {
+            "speaker": "A",
+            "text": "ええっ、そんなことまでできるの！？自分でプログラムを書かなくても、Space同士をつなぐだけで自動で動くって、まさに「おもちゃ箱」どころか「魔法の箱」だね！"
+          },
+          {
+            "speaker": "B",
+            "text": "まさにその通りですわ。日本語モデルで会話を楽しみ、画像生成でビジュアルを作り、3D変換で立体化する。これら全てが、Hugging FaceのSpaces上で無料で完結しますの。しかも、コードを一行も書かずにですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "もういても立ってもいられないよ！今日帰ったらすぐに「パリのモニュメント3Dギャラリー」を作ってみるね。でも、こんなに簡単に遊べるなら、誰でもAI開発者になれそうだね！"
+          },
+          {
+            "speaker": "B",
+            "text": "そうですわね。ただし、次回はその「誰でもアップロードできる」という自由さが生む、品質やセキュリティの課題についてもお話ししますわ。遊ぶ前に、知っておくべき注意点もありますのよ。"
+          },
+          {
+            "speaker": "A",
+            "text": "あ、確かに。無料で遊べるのは嬉しいけど、変なモデルも混ざってるかもしれないもんね。でもまずは、今日教えてもらった具体例を片っ端から試してみるよ！"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 2,
+        "title": "無料の落とし穴？品質管理とセキュリティの課題",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "前回は日本語モデルや画像生成、3D変換まで無料で遊べるって聞いて、もうワクワクが止まらないよ！でも、ふと気になったんだけど、誰でもアップロードできるってことは、中には変なモデルも混ざってるんじゃないかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "鋭い指摘ですわね。実は、誰でもアップロードできるHugging Faceには、悪意のあるコードが仕込まれたモデルや、情報不足のモデルカードが潜んでいるんです。これが今回のテーマ「無料の落とし穴」ですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "えっ、悪意のあるコードって…ウイルスみたいなもの？せっかく無料で遊べるのに、そんな危険があるならちょっと怖いなあ。"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。研究によると、Hugging Face上の一部のモデルに悪意のあるコードが埋め込まれているケースが確認されています [src=10]。例えば、モデルをダウンロードした際に裏で勝手にデータを外部送信するような仕掛けが含まれている可能性がありますの。"
+          },
+          {
+            "speaker": "A",
+            "text": "それは怖すぎるよ…でも、そういうのってどうやって見分ければいいんだろう？普通に使ってるだけじゃ気づかないよね。"
+          },
+          {
+            "speaker": "B",
+            "text": "確かに難しい問題ですわね。さらに、多くのモデルカードでデータセット、バイアス、ライセンス情報が不十分であることも指摘されています [src=12]。つまり、どんなデータで学習したのか、どのような偏りがあるのか、商用利用していいのかすら不明なモデルが大量にあるんです。"
+          },
+          {
+            "speaker": "A",
+            "text": "モデルカードって、商品で言うところの説明書みたいなものだよね。それが不十分だと、安心して使えないなあ。特にライセンスが曖昧だと、後でトラブルになりそうだし。"
+          },
+          {
+            "speaker": "B",
+            "text": "おっしゃる通りですわ。そして、メンテナンスの問題もありますの。多くのモデルが一度公開された後にほとんど更新されず、メンテナンスが不十分なんです [src=16]。公開当時は性能が良くても、時間が経つとセキュリティ上の脆弱性が放置されたままになる危険性がありますわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "つまり、公開したらやりっぱなしのモデルが多いってことか。それって、ユーザーからすると「使うな」って言われてるようなものだね。でも、なんでそんなに放置されるんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "一因として、プラットフォームの成長速度が急激すぎることが挙げられますわ。最初の100万モデル達成に約1,000日かかったのに対し、次の100万モデルは335日で達成され、成長速度が約65%短縮されました [src=23]。つまり、新しいモデルが次々とアップロードされる一方で、古いモデルの管理が追いついていないんです。"
+          },
+          {
+            "speaker": "A",
+            "text": "そんなに急成長してるんだ…確かに、管理が追いつかないのもわかる気がする。でも、ユーザーとしては安心して使いたいから、何か対策はあるのかな？"
+          },
+          {
+            "speaker": "B",
+            "text": "まず、ダウンロード数やコミュニティの評価を参考にするのが基本ですわ。また、Hugging Face自体も悪意のあるモデルをスキャンする仕組みを導入し始めていますの。ただし、完全に防ぐのは難しいのが現状ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、完全には防げないのか。じゃあ、個人でできる対策って何かある？例えば、サンドボックス環境で動かすとか？"
+          },
+          {
+            "speaker": "B",
+            "text": "良い考えですわね。特に、コードを実行するタイプのモデルは、隔離された環境で試すのが安全ですわ。また、Spacesのデモはブラウザ上で動作するので、比較的安全に試せますの。直接モデルをダウンロードするよりリスクが低いですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "それなら、まずはSpacesで遊んでみるのが良さそうだね。でも、せっかく無料で使えるのに、こういうリスクがあるって知っておくのは大事だな。無料の裏にはちゃんと落とし穴があるってことか。"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。無料で最先端のAIに触れられるのは素晴らしい機会ですが、品質やセキュリティには常に注意を払う必要があります。賢く使えば、Hugging Faceは本当に強力なツールですのよ。"
+          },
+          {
+            "speaker": "A",
+            "text": "うん、リスクを理解した上で、楽しみたいと思うよ。まずはSpacesで安全に遊んでみるね。でも、もし悪意のあるモデルを見つけたらどうすればいいんだろう？"
+          },
+          {
+            "speaker": "B",
+            "text": "Hugging Faceには報告機能がありますの。不審なモデルを見つけたら、プラットフォームに報告することで、コミュニティ全体の安全性向上に貢献できますわ。みんなで守っていく姿勢が大切ですわね。"
+          }
+        ]
+      },
+      {
+        "segment_type": "conclusion",
+        "topic_index": null,
+        "title": "まとめ: AIの“GitHub”ことHugging Face、実は誰でも無料で遊べる“おもちゃ箱”だった！",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "さて、今日はHugging Faceの話をたっぷり聞いてきたけど、改めて振り返ると、まずは「誰でも無料で最先端AIを試せるおもちゃ箱」ってのが一番のポイントだったね。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、その通りですわ。第1トピックでは、Hugging FaceがAIの“GitHub”と呼ばれる理由、TransformersライブラリやSpacesの仕組みをお伝えしました。第2トピックでは、日本語モデルや画像生成、3D変換まで実際に無料で遊べる具体例をご紹介しましたわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "そうそう、LFM2.5-1.2B-JP-202606っていう日本語モデルとか、ideogram4で画像生成したり、TripoSplatで写真から3Dモデルを作ったり…本当に夢が広がる話だったよ。でも、第3トピックで聞いた「無料の落とし穴」も忘れちゃいけないね。悪意のあるコードや情報不足のモデルカード、メンテナンス不足のリスクがあるってことを知った。"
+          },
+          {
+            "speaker": "B",
+            "text": "その認識が大切ですわ。無料で遊べるからこそ、品質やセキュリティには注意が必要です。ただし、Spacesのデモはブラウザ上で動作するため、直接モデルをダウンロードするよりリスクが低いですわ。まずはSpacesから始めるのが賢い方法ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "つまり、番組の結論としては「まずはHugging FaceのSpacesにアクセスして、画像生成や日本語チャットを無料で試してみてください。遊びながら、AIの“今”を体感しましょう！」ってことだね。私も今日帰ったら、絶対に「パリのエッフェル塔の上で踊る猫」を生成してみるよ！"
+          },
+          {
+            "speaker": "B",
+            "text": "素晴らしいですわ。ぜひその画像をTripoSplatにアップロードして、3Dの猫をぐるぐる回してみてください。もしかしたら、あなたの作った作品が次の人気デモになるかもしれませんわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "それは楽しみだなあ！視聴者のみんなも、まずはSpacesで気軽に触れてみてほしいね。そして、もし変なモデルを見つけたら、報告機能で教えてあげるのも大事だよ。みんなで安全なAIの遊び場を作っていこう！"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。それでは、今日の放送はここまで。次回もまた、AIの面白い世界をご紹介しますわ。お楽しみに！"
+          }
+        ]
+      }
+    ],
+    "metrics": {
+      "intro": {
+        "prompt_chars": 1656,
+        "output_chars": 1314,
+        "elapsed_sec": 17.685268833010923,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_0": {
+        "prompt_chars": 2937,
+        "output_chars": 2189,
+        "elapsed_sec": 28.876881625008537,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_1": {
+        "prompt_chars": 4451,
+        "output_chars": 2935,
+        "elapsed_sec": 40.38261475000763,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_2": {
+        "prompt_chars": 6439,
+        "output_chars": 2686,
+        "elapsed_sec": 36.43947470799321,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "conclusion": {
+        "prompt_chars": 7631,
+        "output_chars": 1331,
+        "elapsed_sec": 20.54266491602175,
+        "attempts": 1,
+        "used_fallback": false
+      }
+    }
+  },
+  "metrics": {
+    "total_numbers_extracted": 27,
+    "matched_to_structured_facts": 10,
+    "matched_ratio": 0.37037037037037035,
+    "highly_specific_count": 18,
+    "highly_specific_unmatched": 9,
+    "false_positive_candidates": 17,
+    "citation_tags_total": 14,
+    "citation_tags_normalized": 14,
+    "citation_tags_inconsistent": 0
+  },
+  "warnings": [
+    {
+      "code": "unmatched_number",
+      "message": "'10万' が structured_facts に見当たりません",
+      "location": "intro"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'10万' が structured_facts に見当たりません",
+      "location": "intro"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'119万' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'119万' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'381個' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'381個' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1万' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'7000件' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'7000件' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'119万' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'119万' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1.2' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'1.2' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'202606' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'202606' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'12億' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'12億' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'90億' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'90億' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1,000' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'1,000' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'65%' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1.2' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'1.2' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "conclusion"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'202606' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'202606' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "conclusion"
+    },
+    {
+      "code": "low_match_ratio",
+      "message": "matched_ratio 37.0% (推奨 50% 以上)",
+      "location": "overall"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[0] (src=22) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['500']",
+      "location": "topic_0_claim_0"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[3] (src=22) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['119', '381', '4']",
+      "location": "topic_0_claim_3"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[0] (src=1) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['12']",
+      "location": "topic_1_claim_0"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[1] (src=3) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['90']",
+      "location": "topic_1_claim_1"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[2] (src=6) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['4']",
+      "location": "topic_1_claim_2"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[3] (src=6) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['2']",
+      "location": "topic_1_claim_3"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[2].key_claims[3] (src=23) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['1,000', '65']",
+      "location": "topic_2_claim_3"
+    },
+    {
+      "code": "freshness_claim_unanchored",
+      "message": "「2025年」の主張が同 turn の src published_date と 一致しません (turn 1): [src=22:2024-09-28]",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "freshness_claim_unanchored",
+      "message": "「2022年」の主張が同 turn の src published_date と 一致しません (turn 7): [src=22:2024-09-28]",
+      "location": "deep_dive_0"
+    }
+  ],
+  "metadata": {
+    "title": "AIのGitHubことHugging Face、無料で遊べるおもちゃ箱だった！",
+    "thumbnail_title": "無料でAI遊び放題",
+    "description": "「AIのGitHub」とも呼ばれるHugging Face。実は誰でも最先端AIを無料で試せる遊び場だったことをご存じですか？この番組では、Hugging Faceの正体から、日本語モデルや画像生成デモなど具体的な遊び方、さらに品質管理やセキュリティの課題まで、ラジオ形式で解きほぐします。\n\n【トピック】\n1. Hugging Faceって何？AIの“GitHub”の正体\n2. 日本語も画像も3Dも！無料で遊べる最先端AIの具体例\n3. 無料の落とし穴？品質管理とセキュリティの課題\n\nまずはSpacesにアクセスして、AIの“今”を体感しましょう！",
+    "hashtags": [
+      "HuggingFace",
+      "AI",
+      "機械学習",
+      "無料AI",
+      "画像生成",
+      "日本語AI",
+      "GitHub",
+      "ラジオ",
+      "テクノロジー",
+      "AI入門"
+    ],
+    "chapters": [
+      {
+        "timestamp": "00:00",
+        "title": "イントロ"
+      },
+      {
+        "timestamp": "00:50",
+        "title": "Hugging Faceって何？AIの“GitHub”の正体"
+      },
+      {
+        "timestamp": "02:10",
+        "title": "日本語も画像も3Dも！無料で遊べる最先端AIの具体例"
+      },
+      {
+        "timestamp": "03:45",
+        "title": "無料の落とし穴？品質管理とセキュリティの課題"
+      },
+      {
+        "timestamp": "05:15",
+        "title": "まとめ"
+      }
+    ],
+    "references": [
+      {
+        "url": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-JP-202606",
+        "title": "LiquidAI/LFM2.5-1.2B-JP-202606 · Hugging Face",
+        "tier": "AA",
+        "published_date": null
+      },
+      {
+        "url": "https://gigazine.net/news/20240928-hugging-face-ai-models/",
+        "title": "Hugging Faceでダウンロード可能なAIモデルの数が100万個を突破 - GIGAZINE",
+        "tier": "B",
+        "published_date": "2024-09-28"
+      },
+      {
+        "url": "https://aiai-news.com/ai-repo/transformers/",
+        "title": "transformers | AIAI Hub",
+        "tier": "B",
+        "published_date": "2026-05-08"
+      },
+      {
+        "url": "https://huggingface.co/blog/mishig/spaces-agents-md",
+        "title": "How an Agent Built a 3D Paris Gallery by Chaining Two Hugging Face Spaces",
+        "tier": "AA",
+        "published_date": null
+      },
+      {
+        "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese",
+        "title": "nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese",
+        "tier": "AA",
+        "published_date": null
+      },
+      {
+        "url": "https://ieeexplore.ieee.org/document/10297271/",
+        "title": "A Large-Scale Analysis of the Hugging Face Platform",
+        "tier": "AAA",
+        "published_date": null
+      },
+      {
+        "url": "https://ieeexplore.ieee.org/document/10556444/",
+        "title": "How do Hugging Face Models Document Datasets, Bias ...",
+        "tier": "AAA",
+        "published_date": null
+      },
+      {
+        "url": "https://ieeexplore.ieee.org/document/10555709",
+        "title": "Analyzing the Evolution and Maintenance of ML Models on Hugging Face | IEEE Conference Publication | IEEE Xplore",
+        "tier": "AAA",
+        "published_date": null
+      },
+      {
+        "url": "https://aiworld.eu/story/hugging-faces-two-million-models-and-counting",
+        "title": "Hugging Face's two million models and counting",
+        "tier": "B",
+        "published_date": "2025-12-08"
+      }
+    ]
+  }
+}

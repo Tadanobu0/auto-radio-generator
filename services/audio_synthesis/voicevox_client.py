@@ -17,6 +17,7 @@ from core.interfaces import IAudioSynthesizer, SynthesisResult, ChapterMarker
 from core.models import Script, AppConfig
 from services.media_processing import JingleProvider
 from .voicevox_segment_timing import calculate_segment_timings
+from .subtitle_layout import layout_turn
 
 console = Console()
 
@@ -455,7 +456,7 @@ class VoicevoxClient(IAudioSynthesizer):
         header = """[Script Info]
 Title: Auto Radio Subtitles
 ScriptType: v4.00+
-WrapStyle: 0
+WrapStyle: 2
 PlayResX: 1920
 PlayResY: 1080
 ScaledBorderAndShadow: yes
@@ -476,19 +477,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             adjusted_start_ms = start_ms + pre_roll_offset_ms
             adjusted_end_ms = end_ms + pre_roll_offset_ms
             
-            start_time = self._ms_to_ass_time(adjusted_start_ms)
-            end_time = self._ms_to_ass_time(adjusted_end_ms)
-            
             # 話者IDに応じてスタイルを選択
             style = "Main" if speaker == "A" else "Sub"
             
-            # BudouXで自然な改行位置を取得（限界設定: 画面端ギリギリまで拡大）
-            from budoux import load_default_japanese_parser
-            parser = load_default_japanese_parser()
-            chunks = parser.parse(text)
-            wrapped_text = self._wrap_subtitle_budoux(chunks, max_chars=28)
-            
-            lines.append(f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{wrapped_text}\n")
+            # 表示層: [src=N] を除去し、実フォントの描画幅で折り返す。安全域と行数上限に
+            # 収まらないターンは連続キューに分け、発話区間を文字数比で配る。
+            for cue in layout_turn(text, adjusted_start_ms, adjusted_end_ms):
+                start_time = self._ms_to_ass_time(cue.start_ms)
+                end_time = self._ms_to_ass_time(cue.end_ms)
+                wrapped_text = "\\N".join(cue.lines)
+                lines.append(f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{wrapped_text}\n")
         
         output_path.write_text("".join(lines), encoding="utf-8")
     

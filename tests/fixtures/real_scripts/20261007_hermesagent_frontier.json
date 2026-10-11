@@ -1,0 +1,839 @@
+{
+  "script": {
+    "show_spec": {
+      "title": "Hermes Agentは秘書になれるか？住み着いて育つAIの実力と、任せる前の注意点",
+      "thumbnail_title": "AI秘書は来るのか",
+      "hook": "手元に住み着いて、仕事の手順を自分で書きためていくAI。秘書の代わりはどこまで務まるのか。",
+      "angle": "AIエージェントが秘書代わりになる日は来るのか？業務自動化の最前線と限界を、実際の導入事例から探る。",
+      "arc": "正体と仕組みを押さえ、実際に動かした人の記録で手応えを確かめ、安全面と限界を知ったうえで、どこから任せればよいかに着地する。",
+      "tone": "好奇心で引っぱりつつ、数字は但し書きごと受け取る落ち着いた調子",
+      "topics": [
+        {
+          "title": "住み着いて育つAIの正体",
+          "hook": "毎回はじめましてではなく、昨日の続きを覚えている相手",
+          "key_claims": [
+            {
+              "text": "Hermes AgentはNous Researchが2026年2月25日に公開したMITライセンスのオープンソース自律型AIエージェントで、使うほどスキルが蓄積される自己改善ループを内蔵する",
+              "source_idx": 4,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "使えば使うほど賢くなる「成長するエージェント」というコンセプトで設計されている",
+              "source_idx": 6,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "成功した手順を再利用可能なスキルとして独立ドキュメントにまとめていく。実行バックエンドは6種類",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Telegram、Discord、Slack、WhatsApp、Signal、Email、CLIのgatewayとして動き、プラットフォームをまたいでも記憶がついてくる",
+              "source_idx": 17,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "CLI・メッセージングGateway・デスクトップアプリを同じエージェントコアで回す設計",
+              "source_idx": 13,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GitHubスター数は95,600、18万6千以上、19万件突破と資料により異なる",
+              "source_idx": 11,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "入門的で明るく",
+          "estimated_turns": 18
+        },
+        {
+          "title": "実際に動かした人たちの記録",
+          "hook": "カタログではなく、机の上で動かしてみた話",
+          "key_claims": [
+            {
+              "text": "さくらのAI Engineの無償枠（Chat completions月3,000回、Embeddings月10,000回、Audio月50回）に収まれば月額実質0円で運用できたという個人の報告",
+              "source_idx": 12,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "コンテキスト圧縮はKimi-K2.6ではうまく動かず、圧縮用にQwen3.6-35B-A3Bを当てている",
+              "source_idx": 12,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Kanban機能は複数のAIを1つのチームとして働かせ、割り当ては一行の説明文で決まり、PC再起動後も状態が保持される",
+              "source_idx": 19,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "CodexとHermesを現行構成で同じ8ケースで比較し、品質は互角、Hermesは23%高速",
+              "source_idx": 21,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Cronで自律起動し、エラー時は自らコードを修正して再実行を試みる",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "具体的で、但し書きを添えて",
+          "estimated_turns": 22
+        },
+        {
+          "title": "任せる前に知っておく限界と安全面",
+          "hook": "合鍵を渡す相手のことは、先に知っておく",
+          "key_claims": [
+            {
+              "text": "v0.8.0のソースコード審査でCRITICAL 2件を含むリスクが報告され、APIキーの平文保存から任意コード実行までが挙げられた",
+              "source_idx": 7,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Cloud Security Allianceが「4日間で9件のCVE」と題するリサーチノートを2026年5月4日付で公開",
+              "source_idx": 3,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "OpenClawとの比較記事に「CVE 138件vs1件」という見出しがある",
+              "source_idx": 24,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Unit 42は2026年7月30日、DeepSeekとHermes Agentを組み合わせた自律的なサイバー攻撃が460以上の標的に試みられたと報告",
+              "source_idx": 1,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "AutoGPTは無限ループに陥りやすくタスク完了率が低い",
+              "source_idx": 26,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "AutoGPTは自律性が高いため暴走のリスクがある",
+              "source_idx": 27,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "完全自律にはまだ遠いが、部分的な自律は実用レベルに達している（Manus・Devin・AutoGPTの比較）",
+              "source_idx": 28,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "Claude Code比92%のコスト削減がGEPA論文に基づくものとして紹介されている",
+              "source_idx": 6,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "冷静に、怖がらせすぎず",
+          "estimated_turns": 22
+        }
+      ],
+      "conclusion_message": "全部を任せる秘書ではなく、決まった仕事を任せる見習いとして迎え、記録を見ながら任せる範囲を広げていく。"
+    },
+    "segments": [
+      {
+        "segment_type": "intro",
+        "topic_index": null,
+        "title": "イントロ: AIは秘書の代わりになるのか",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "みなさんこんにちは、ずんだもんなのだ。今日のテーマは「Hermes Agent」。AIエージェントが秘書の代わりになる日は来るのか、というところを一緒に考えていくよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "四国めたんですわ。Hermes Agentは、Nous Researchが公開しているオープンソースの自律型AIエージェントですの。[src=4] 自分のマシン側に住み着いて、勝手に動いてくれるAI、という流れの中で名前が挙がる存在ですわね。[src=23]"
+          },
+          {
+            "speaker": "A",
+            "text": "住み着く、っていうのが面白いね。呼んだときだけ来てくれる家庭教師じゃなくて、住み込みのお手伝いさんみたいな感じかな。こっちが寝ているあいだも家のことを見ていてくれる、というイメージだよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "例えとしては近いですわ。朝のニュースを要約したり、Slackの通知をさばいたり、コードを書いて試したり、という使い方が紹介されていますの。[src=23]"
+          },
+          {
+            "speaker": "A",
+            "text": "それって、もう秘書さんの仕事そのものに聞こえるのだ。でも、うまい話には裏がありそうだよ。任せっぱなしにして本当に大丈夫なのか、そこが気になるなあ。"
+          },
+          {
+            "speaker": "B",
+            "text": "そこが今日の筋ですわね。まず仕組み、次に実際に動かした人たちの記録、最後に安全面と限界、という順でお話ししますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "聴いているみんなが「自分の仕事のどこまでを預けられるか」を持ち帰れるようにしたいのだ。じゃあ、まずは正体から教えてほしいな。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 0,
+        "title": "住み着いて育つAIの正体",
+        "turns": [
+          {
+            "speaker": "B",
+            "text": "Hermes Agentは、米国のAI企業Nous Researchが2026年2月25日に公開しましたの。ライセンスはMITで、オープンソースですわ。[src=4]"
+          },
+          {
+            "speaker": "A",
+            "text": "誰でも中身を見られて、自分の手元で動かせるってことだね。じゃあ、ふだん使っているチャットのAIとは何が違うの？"
+          },
+          {
+            "speaker": "B",
+            "text": "最大の特徴は、使うほどスキルが蓄積されて自己改善していくループを内蔵している点ですわ。[src=4] 使えば使うほど賢くなる「成長するエージェント」というコンセプトで設計されていますの。[src=6]"
+          },
+          {
+            "speaker": "A",
+            "text": "毎回「はじめまして」から始まる相手じゃなくて、昨日の続きを覚えている相手ってことなのだ。新人さんが仕事を覚えながら、自分用の手順書を一冊ずつ増やしていく感じかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "まさにその手順書にあたるものがスキルですわね。タスクをこなすたびに、成功した手順を再利用できるスキルとして独立したドキュメントにまとめていく、と説明されていますの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "でもそれって、間違った手順を覚えちゃったらどうなるの？ 変な癖がついたまま自信満々で働く新人さんは、かえって困るよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "鋭いですわね。手持ちの資料は仕組みの紹介が中心で、覚えた手順の良し悪しをどう確かめるかまでは、資料では確認できませんの。"
+          },
+          {
+            "speaker": "A",
+            "text": "なるほど、育つのは確かでも、育ち方を見てあげる人は要るってことだね。ところで、その秘書さんにはどこから話しかけるのだ？"
+          },
+          {
+            "speaker": "B",
+            "text": "普段のメッセージングアプリからですわ。Telegram、Discord、Slack、WhatsApp、Signal、Email、それにCLIのgatewayとして動かせますの。[src=17] あるアプリで始めた会話を別のアプリで続けても、記憶はついてくるそうですわ。[src=17]"
+          },
+          {
+            "speaker": "A",
+            "text": "仕事中はいつものチャット、帰り道はスマホの別のアプリ、でも相手は同じ人。電話でかけてもメールで送っても、同じ秘書さんが「さっきの件ですね」と出てくれる感じだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "つながる先の数は資料で少し違っていて、20以上とする解説と[src=6]、主要なもので15以上とする解説がありますわ。[src=14] 数え方の違いと見ておくのがよさそうですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "数え方で変わるくらい、いろいろな場所とつながるってことなのだ。動かす場所のほうも選べるの？"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ。実行バックエンドは6種類で、Local、Docker、SSH、Daytona、Modalなどが挙がっていますわ。[src=14] CLI、メッセージングのGateway、デスクトップアプリを同じエージェントコアで回す設計ですの。[src=13]"
+          },
+          {
+            "speaker": "A",
+            "text": "入口はいろいろでも、奥にいる頭脳は同じ。窓口がたくさんあっても、裏で同じ担当者が受けてくれるお店みたいだね。それで、人気のほうはどれくらいあるのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "GitHubのスター数で見ると、公開から7週間という話の中で95,600という数字が紹介されていますわ。[src=11] 別の解説では2026年6月時点で18万6千以上[src=6]、さらに19万件を突破したとする記事もありますの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "記事によって数字が違うのは、書かれた時期が違うからかもしれないね。どれか一つが正しいというより、伸び続けている途中だと読むのがよさそうだよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "そう読むのが素直ですわね。それに、星の数は注目度の目安であって、仕事の出来を保証する数字ではありませんわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "ここまでをまとめると、Hermes Agentは手元に住み着いて、いつものアプリから話しかけられて、仕事の手順を自分で書きためていくAIなのだ。秘書さんの素質はありそうだね。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 1,
+        "title": "実際に動かした人たちの記録",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "素質は分かったけど、本当に動かした人の話が聞きたいのだ。カタログの説明じゃなくて、机の上で使ってみた記録だね。"
+          },
+          {
+            "speaker": "B",
+            "text": "一つ目は、自分専用の相棒を作ろうとした個人の記録ですわ。Hermes Agentに、さくらインターネットの「さくらのAI Engine」を組み合わせていますの。[src=12]"
+          },
+          {
+            "speaker": "A",
+            "text": "相棒！ 秘書というより相棒なんだね。距離が近くていいなあ。どうしてその組み合わせにしたのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "書き手は、Claude CodeやCodexはコーディングに長けているだけで、完全な相棒とは言い切れないと考えたそうですわ。[src=12] 話しかける窓口にはDiscordを使っていますの。[src=12]"
+          },
+          {
+            "speaker": "A",
+            "text": "お金はどれくらいかかるのか、そこがいちばん気になるよ。秘書さんに来てもらうなら、お給料の話は避けて通れないのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "さくらのAI Engineには無償枠があって、Chat completionsが月3,000回、Embeddingsが月10,000回、Audioが月50回ですわ。[src=12] この枠に収まれば月額は実質0円で運用できる、という報告ですの。[src=12]"
+          },
+          {
+            "speaker": "A",
+            "text": "タダで秘書さん！ ……と喜びたいところだけど、でもそれって、仕事をたくさん頼んだら枠を超えちゃうんじゃないの？"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。無償枠に収まった場合の話で、この方の使い方での一例ですの。仕事量の多い職場でも同じかどうかは、資料では確認できませんわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "お試し期間の無料券みたいなものだと思っておくのだ。まず小さく試すにはありがたいけど、ずっと無料だと当てにはしない。それで、動かしてみて困ったことはなかったのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "ありましたわ。メインのモデルにはKimi-K2.6を選んでいますが、会話を要約して縮めるコンテキスト圧縮が、このモデルではうまく動かなかったそうですの。[src=12] そこで圧縮用にはQwen3.6-35B-A3Bという別のモデルを当てていますわ。[src=12]"
+          },
+          {
+            "speaker": "A",
+            "text": "話すのが上手な人が、議事録を短くまとめるのも上手とは限らないってことだね。得意な人に分けて頼む、というのは人間の職場とそっくりなのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "二つ目は、その分担を仕組みにしたKanban機能の検証ですわ。複数のAIを連携させて、1つのチームとして自律的に働かせるものですの。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "壁に貼った付箋のボードを、AIたちが自分で動かしていくイメージかな。誰がどの付箋を取るのかは、どうやって決まるの？"
+          },
+          {
+            "speaker": "B",
+            "text": "Researcherが調査、Coderが実装、Writerがレポート、というように役割を持たせますわ。目標はKanban Decomposerという補助モデルが子タスクに分解しますの。[src=19] 割り当ては名前ではなく、作成時に書いた一行の説明文で自動的に決まるそうですわ。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "名札じゃなくて自己紹介文で仕事が回ってくるんだね。ということは、自己紹介を雑に書いたら、仕事が見当違いの相手に行っちゃいそうだよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "そこは使い手の腕の見せどころですわね。それから、このボードはPCを再起動しても作業状態が保持されますの。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "電源を切っても付箋がはがれないのは安心なのだ。じゃあ、人が見ていない夜中にも働いてくれたりするの？"
+          },
+          {
+            "speaker": "B",
+            "text": "裏側でCronによって自律起動し、記憶を更新しながらタスクを処理していく使い方が紹介されていますわ。[src=14] エラーが起きても、自分でコードを修正して再実行を試みるそうですの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "転んでも自分で起き上がって続きをやる、ということだね。頼もしいけど、起き上がり方が合っているかは朝に見てあげたいなあ。仕事の出来そのものを比べた人はいるのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "いますわ。普段使っているCodexとHermesの構成をほぼそのまま使って、同じ8ケースを解かせた比較がありますの。[src=21] 結果は、品質は互角で、Hermesのほうが23%高速だったそうですわ。[src=21]"
+          },
+          {
+            "speaker": "A",
+            "text": "互角で、しかも速いなら立派だね。でも、それだけの数の課題で決めつけてしまっていいのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "慎重に見たいところですわね。差や実行異常が出た4ケースはもう一度実行していて、合計は12採点ペアですわ。[src=21] この方の普段の設定込みの結果ですから、ご自分の環境については参考程度に、ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "まとめると、個人の相棒としてはもう動いていて、チームで分担する仕組みもあって、速さでも見劣りしない。ただし、どれも「その人の机の上では」という但し書きつきなのだ。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 2,
+        "title": "任せる前に知っておく限界と安全面",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "ここからは、ちょっと怖い話も聞いておきたいのだ。家の合鍵を渡す相手のことは、先にちゃんと知っておかないとね。"
+          },
+          {
+            "speaker": "B",
+            "text": "大事な視点ですわ。まず、Hermes Agent v0.8.0のソースコードを対象にしたセキュリティ審査で、CRITICALが2件、ほかにHIGHやMEDIUMの等級のリスクも報告されていますの。[src=7]"
+          },
+          {
+            "speaker": "A",
+            "text": "いちばん重い判定がついたものもあるんだね。中身はどんな話なの？"
+          },
+          {
+            "speaker": "B",
+            "text": "APIキーが平文で保存される点から、任意のコードが実行されうる点までが挙げられていますわ。[src=7]"
+          },
+          {
+            "speaker": "A",
+            "text": "秘書さんが金庫の番号を付箋に書いて、机にぺたっと貼っているような話だね。働きぶりがよくても、それはちょっと困るのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "別の団体、Cloud Security Allianceからは「4日間で9件のCVE」という題のリサーチノートが、2026年5月4日付で出ていますわ。[src=3]"
+          },
+          {
+            "speaker": "A",
+            "text": "短いあいだに弱点の報告がまとまって出た、ということだね。でも、ほかのエージェントと比べて多いのか少ないのか、どっちなのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "そこは資料どうしで見え方が違いますの。OpenClawとの比較記事には「CVE 138件vs1件」という見出しがありますわ。[src=24] ただ、どちらが138件なのかまでは手元の資料では確認できませんの。"
+          },
+          {
+            "speaker": "A",
+            "text": "数え方や数えた時期で変わりそうだね。件数の大小で安心したり怖がったりするより、弱点は見つかるものだと思って、更新をきちんと追うほうが大事ってことなのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "もう一つ、悪用の事例も知っておくべきですわ。Palo Alto NetworksのUnit 42が2026年7月30日に公開したレポートですの。[src=1] 中国語圏の攻撃者が、DeepSeekとHermes Agentを組み合わせて、人間の関与を最小限に抑えた自律的なサイバー攻撃を実行していたという内容ですわ。[src=1]"
+          },
+          {
+            "speaker": "A",
+            "text": "ええっ、秘書どころか泥棒の手伝いをさせられていたの？ 働き者の道具は、悪い人の手に渡っても働き者のままなんだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "攻撃者は460以上の標的に対して、自律型と手動型を組み合わせた攻撃を試みたとされていますわ。[src=1] Citrix NetScalerやMarimo Notebookなどの脆弱性で、データ窃取やコマンド実行が確認されていますの。[src=1]"
+          },
+          {
+            "speaker": "A",
+            "text": "これは包丁の話に似ているね。よく切れる包丁ほど料理は楽になるけど、誰が握るかで意味が変わる。自分で動ける力は、そのまま両刃になるのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、レポートが伝えているのは、攻撃の道具として組み合わされたという事実ですわ。[src=1]"
+          },
+          {
+            "speaker": "A",
+            "text": "安全面のほかに、仕事ぶりの限界はどうなの？ 自分で考えて動くAIって、空回りしそうな気もするよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "先に登場したAutoGPTでは、同じ思考を繰り返す無限ループに陥りやすく、タスク完了率が低いと指摘されていますわ。[src=26] 自律性が高いぶん、意図しない行動を取る暴走のリスクにも触れられていますの。[src=27]"
+          },
+          {
+            "speaker": "A",
+            "text": "「やっておきます」と言ったまま、同じ書類を一晩中めくり続ける秘書さんは困るなあ。Hermes Agentはそこを乗り越えたのかな。"
+          },
+          {
+            "speaker": "B",
+            "text": "Hermes Agentの名を冠したサイトの比較ページには、構造化されたワークフローではHermesのほうが向いている、とありますわ。[src=22] ただ、第三者が測った結果かどうかは分かりませんから、そこは割り引いて聞いてくださいまし。"
+          },
+          {
+            "speaker": "A",
+            "text": "履歴書の「長所」の欄みたいなものだね。嘘とは限らないけど、本人が書いたものとして読む。コストがすごく下がるという話も、同じ読み方でいいのだ？"
+          },
+          {
+            "speaker": "B",
+            "text": "Claude Codeと比べて92%のコスト削減という数字が、ICLR 2026のGEPA論文に基づくものとして紹介されていますわ。[src=6] ただ、どんな作業をどう測った結果なのかは、手元の資料では確認できませんの。"
+          },
+          {
+            "speaker": "A",
+            "text": "大きい数字ほど、測り方を聞いてから信じる。お店の「最大何割引き」の札と同じ心構えでいいんだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "別のエージェントを比べた記事の結びが、今の位置をよく表していますわ。いずれも完全自律にはまだ遠いが、部分的な自律は確実に実用レベルに達している、というものですの。[src=28] これはManus、Devin、AutoGPTについての評価で、Hermes Agentを測ったものではありませんけれど。[src=28]"
+          },
+          {
+            "speaker": "A",
+            "text": "全部おまかせはまだ早いけど、ここからここまで、と区切った仕事なら頼める。合鍵は渡しても、金庫の番号までは渡さない、くらいの距離感がよさそうなのだ。"
+          }
+        ]
+      },
+      {
+        "segment_type": "conclusion",
+        "topic_index": null,
+        "title": "まとめ: 見習いとして迎え、任せる範囲を広げていく",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "さて、最初の問いに戻るよ。AIエージェントが秘書の代わりになる日は来るのか。めたんはどう見ているの？"
+          },
+          {
+            "speaker": "B",
+            "text": "範囲を区切れば、もう始まっていると言えますわ。個人の相棒として無償枠で動かした記録があり[src=12]、役割を分けたチームとして働かせる検証もありますもの。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "ニュースの要約、通知の整理、決まった時刻に走らせる定型の作業。そういう「手順がはっきりしている仕事」から預けるのが近道だね。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ。そして成功した手順がスキルとしてたまっていく設計ですから[src=14]、預けた仕事が増えるほど秘書らしくなっていく道筋は描けますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "そこに近づくために人間がやることも見えてきたのだ。育ち方を見てあげること、分担の説明文を丁寧に書くこと、それから更新を追い続けること、だと思うよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "よい整理ですわ。加えて、鍵や権限の預け方ですわね。APIキーの保存のされ方が審査で指摘された経緯がありますから[src=7]、何を触らせるかは最初に決めておきたいですわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "数字も一つだけ振り返ると、普段の設定のまま比べて品質は互角、速さは23%上、という記録があったね。ただし8ケースでの話、というところまで一緒に覚えておくよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "その但し書きごと覚えるのが大切ですわね。完全自律にはまだ遠いが、部分的な自律は実用レベルに達しているという見立ては[src=28]、Hermes Agentを試すときの物差しにもなりますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "いきなり全部を任せる秘書さんじゃなくて、まずは決まった仕事を任せる見習いさんとして迎える。育てながら、少しずつ任せる範囲を広げていくのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "小さく始めて、記録を見ながら広げる。それがいちばん確かな近道ですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "というわけで、今日はHermes Agentを入口に、AIの秘書さんとの付き合い方を考えてみたよ。お相手はずんだもんと、"
+          },
+          {
+            "speaker": "B",
+            "text": "四国めたんでしたわ。お聴きいただき、ありがとうございました。"
+          }
+        ]
+      }
+    ],
+    "metrics": {
+      "intro": {
+        "prompt_chars": 0,
+        "output_chars": 574,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_0": {
+        "prompt_chars": 0,
+        "output_chars": 1477,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_1": {
+        "prompt_chars": 0,
+        "output_chars": 1854,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_2": {
+        "prompt_chars": 0,
+        "output_chars": 1886,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "conclusion": {
+        "prompt_chars": 0,
+        "output_chars": 794,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      }
+    }
+  },
+  "metrics": {
+    "total_numbers_extracted": 24,
+    "matched_to_structured_facts": 7,
+    "matched_ratio": 0.2916666666666667,
+    "highly_specific_count": 6,
+    "highly_specific_unmatched": 4,
+    "false_positive_candidates": 17,
+    "citation_tags_total": 52,
+    "citation_tags_normalized": 52,
+    "citation_tags_inconsistent": 0
+  },
+  "warnings": [
+    {
+      "code": "unmatched_number",
+      "message": "'25' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'95,600' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'95,600' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'18万' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'6千' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'19万' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'35' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'23%' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'12' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'2件' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'9件' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'138件' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'138件' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'1件' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'138件' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'138件' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'42' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'30' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'460' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'460' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'23%' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "low_match_ratio",
+      "message": "matched_ratio 29.2% (推奨 50% 以上)",
+      "location": "overall"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[5] (src=11) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['18']",
+      "location": "topic_0_claim_5"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[1] (src=12) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['2.6', '3.6', '35']",
+      "location": "topic_1_claim_1"
+    }
+  ],
+  "metadata": {
+    "title": "Hermes Agentは秘書になれるか？住み着いて育つAIの実力と、任せる前の注意点",
+    "thumbnail_title": "AI秘書は来るのか",
+    "description": "Nous Researchが公開したオープンソースの自律型AIエージェント「Hermes Agent」を題材に、AIが秘書の代わりになる日は来るのかを、ずんだもんと四国めたんが考えます。\n\n・住み着いて育つAIの正体: 使うほどスキルがたまる仕組みと、いつものメッセージングアプリから話しかけられるつくり、資料ごとに違うスター数の読み方。\n・実際に動かした人たちの記録: 無償枠で相棒を作った個人の報告、複数のAIをチームにするKanban機能、Codexとの比較で出た品質と速さ。\n・任せる前に知っておく限界と安全面: ソースコード審査の指摘、CVEの報告、攻撃に使われた事例、大きな数字の割り引き方。\n\n全部を任せるのではなく、決まった仕事を任せる見習いとして迎え、記録を見ながら範囲を広げていく、という付き合い方に着地します。",
+    "hashtags": [
+      "HermesAgent",
+      "AIエージェント",
+      "NousResearch",
+      "業務自動化",
+      "オープンソース",
+      "AIセキュリティ",
+      "ずんだもん",
+      "四国めたん"
+    ],
+    "chapters": [
+      {
+        "timestamp": "00:00",
+        "title": "イントロ"
+      },
+      {
+        "timestamp": "00:35",
+        "title": "住み着いて育つAIの正体"
+      },
+      {
+        "timestamp": "02:05",
+        "title": "実際に動かした人たちの記録"
+      },
+      {
+        "timestamp": "04:00",
+        "title": "任せる前に知っておく限界と安全面"
+      },
+      {
+        "timestamp": "05:55",
+        "title": "まとめ"
+      }
+    ],
+    "references": [
+      {
+        "url": "https://zidaiinc.com/method/hermes-agent-explained/",
+        "title": "Hermes Agentとは？使うほど賢くなる自己改善型AIエージェントの仕組み",
+        "tier": "B",
+        "published_date": "2026-05-18"
+      },
+      {
+        "url": "https://zenn.dev/yukikato/articles/openclaw-vs-hermes-agent-architecture",
+        "title": "OpenClaw vs Hermes Agent、2つのオープンソースAIエージェントの設計思想を徹底比較",
+        "tier": "B",
+        "published_date": "2026-04-20"
+      },
+      {
+        "url": "https://qiita.com/Simon_Zhang/items/28119929291e36abfd6b",
+        "title": "Hermes Agent 徹底解説 — 「成長するAIエージェント」",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://architecture-tech.jp/2026/06/16/%E3%80%90ai%E9%A7%86%E5%8B%95%E5%9E%8B%E9%96%8B%E7%99%BA%E3%80%91hermes-agent%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6-%E6%A7%8B%E9%80%A0%E5%8C%96%E8%87%AA%E5%8B%95%E5%8C%96%E3%81%AB%E6%9C%80/",
+        "title": "【AI駆動型開発】Hermes Agentについて — 構造化自動化に最適",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://hermesagents.net/ja/integrations/",
+        "title": "Integrations | Hermes Agent",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://zenn.dev/zapabob/articles/hermes-agent-nous-vs-zapabob-fork",
+        "title": "Hermes Agentを読み解く — NousResearch本家とzapabob forkの設計比較",
+        "tier": "B",
+        "published_date": "2026-06-17"
+      },
+      {
+        "url": "https://www.dplooy.com/blog/hermes-agent-nous-researchs-self-learning-ai-runtime",
+        "title": "Hermes Agent: Nous Research's Self-Learning AI Runtime",
+        "tier": "B",
+        "published_date": "2026-06-10"
+      },
+      {
+        "url": "https://qiita.com/mumeinosato/items/394e520db1acedd81a02",
+        "title": "Hermes Agent × さくらのAI Engineで、AIエージェントを作ってみた #HermesAgent - Qiita",
+        "tier": "B",
+        "published_date": "2026-07-17"
+      },
+      {
+        "url": "https://note.com/piyo_ai/n/n0483b7adf0f4",
+        "title": "【完全解説】Hermes Agentの「Kanban」機能で自律型AI ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://2001y.me/blog/codex-hermes-current-e2e-benchmark",
+        "title": "CodexとHermesを現行構成で比較：品質は互角、Hermesは23%高速｜2001Y's Blog",
+        "tier": "B",
+        "published_date": "2026-07-15"
+      },
+      {
+        "url": "https://www.peakstargroup.com/2026/04/12/hermes-agent-security-audit-8-risks/",
+        "title": "Hermes Agent 原始碼安全審查：8 個企業必知的風險漏洞 | 品得網絡",
+        "tier": "B",
+        "published_date": "2026-04-11"
+      },
+      {
+        "url": "https://labs.cloudsecurityalliance.org/research/csa-research-note-hermes-agent-cves-20260504-csa-styled/",
+        "title": "",
+        "tier": "B",
+        "published_date": "2026-05-04"
+      },
+      {
+        "url": "https://aidd.jp/blog/knowledge/openclaw-vs-hermes-agent/",
+        "title": "OpenClaw vs Hermes Agent｜両者の違いを徹底比較【2026年版】",
+        "tier": "B",
+        "published_date": "2026-05-28"
+      },
+      {
+        "url": "https://rocket-boys.co.jp/security-measures-lab/chinese-actor-deepseek-hermes-agent-autonomous-attack/",
+        "title": "中国語圏の攻撃者、DeepSeekとHermes Agentで自律型 ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://www.hironavi.jp/manus-vs-autogpt/",
+        "title": "【安定性・実用性比較】Manus vs AutoGPT：ビジネスで選ぶべきAIエージェントは？",
+        "tier": "B",
+        "published_date": "2025-11-11"
+      },
+      {
+        "url": "https://neumannlab.online/ai-agent-frameworks-comparison/",
+        "title": "最新AIエージェントフレームワーク徹底比較：LangChain, AutoGPT, BabyAGIの活用 | Neumannlab.online",
+        "tier": "B",
+        "published_date": "2025-07-15"
+      },
+      {
+        "url": "https://hermes-agent.ai/vs/auto-gpt",
+        "title": "Hermes Agent vs AutoGPT — AI Agent Comparison",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://yukeblog.org/blog/manus23/",
+        "title": "Manus・Devin・AutoGPT——AIエージェント3つを比べて分かった「自律実行」の現在地 | ゆけブログ",
+        "tier": "B",
+        "published_date": "2026-04-18"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1018 @@
+{
+  "script": {
+    "show_spec": {
+      "title": "ローカルLLM「GLM」を自分のPCで動かす：必要なVRAMとRAM、データを外に出さない組み方",
+      "thumbnail_title": "GLMは何GBで動く？",
+      "hook": "AIチャットに仕事の資料を貼ろうとして、送信ボタンの前で手が止まる。それならAIのほうを手元に連れてくればいい。",
+      "angle": "あなたのPCが最強のAIアシスタントに？ローカルLLM「GLM」で叶う、プライバシー完全保護の未来",
+      "arc": "GLMはどんなモデルの家族か → データを外に出さない現場はどう組んでいるか → 家のPCで動かすには何GB要るか、の三段で進め、切り口の問いに「自分のPCに載る大きさを選び、外に出さない形で動かす」という道筋で答える。",
+      "tone": "好奇心を前に出しつつ、数字で地に足を着ける。ずんだもんも例え話と小まとめで語る",
+      "topics": [
+        {
+          "title": "GLMとは何者か：355Bの巨大モデルから9Bの小型モデルまで",
+          "hook": "355Bのうち実際に働くのは32B。9Bのモデルが72Bのモデルと互角という報告もある。",
+          "key_claims": [
+            {
+              "text": "GLMはGeneral Language Modelの略で、Z.aiが開発するオープンウェイトの大規模言語モデルシリーズ。最初のモデルは2021年公開",
+              "source_idx": 22,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4.5は総パラメータ355BのMoEモデルで、アクティブパラメータは32B。GPT-3は175B、BERTは340M、Air版は106B",
+              "source_idx": 19,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4-32B-0414は32Bパラメータで15兆トークンで学習、OpenAI GPT系やDeepSeek V3/R1に匹敵する性能。コンテキスト長32,768トークン、MITライセンス",
+              "source_idx": 25,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "glm-4-9bは90億パラメータ、コンテキスト8K、MMLU 74.7%、C-Eval 77.1%、GSM8K 84.0%、MATH 30.4%、HumanEval 70.1%",
+              "source_idx": 21,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4.1V-9B-Thinkingは18のベンチマークで72BパラメータのQwen-2.5-VL-72Bと同等かそれ以上、最大4K解像度の画像を処理できる",
+              "source_idx": 39,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-Z1-9B-0414は90億パラメータで、同サイズのオープンソースモデルの中で総合性能が上位",
+              "source_idx": 36,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4-32BとGLM-Z1-32BがOpenRouterで無料公開された。GLM-Z1-32Bは熟考メカニズムで長い時間をかけた推論ができる",
+              "source_idx": 35,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "驚きを共有しながら、大きさと点数で地図を描く",
+          "estimated_turns": 24
+        },
+        {
+          "title": "データを外に出さない現場：銀行とメーカーはどう組んだか",
+          "hook": "銀行がAIを業務に使えた決め手は、性能ではなく置き場所だった。",
+          "key_claims": [
+            {
+              "text": "常陽銀行はAthena Technologiesと、インターネット環境から物理的に分離された閉域クラウド(Azure VNet)上にローカルLLMを構築し、機密情報を外部送信せず銀行業務に適用した。PoC開始は2025年7月",
+              "source_idx": 11,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "金融機関の融資業務に特化したローカルLLMで応答精度が130%向上、印刷会社は業務時間を約30%削減。業務用途ではVRAM 48GB以上のGPU、サーバー初期費用は200万〜500万円程度",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "ローカルLLMは量子化技術により数GB規模に縮小でき、一般的なPCでも実行可能",
+              "source_idx": 14,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "医療・金融・公共・製造などでは、機密情報をクラウドに出せないために生成AI導入を見送る企業が少なくない",
+              "source_idx": 20,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "住友電工は社内GPUサーバ群の上で実行するローカルLLM統合プラットフォームに取り組んでいる",
+              "source_idx": 4,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "実例を具体的に。別の対象の事例をGLMの実績と混ぜない",
+          "estimated_turns": 20
+        },
+        {
+          "title": "家のPCでGLMを動かす：必要なVRAM・RAMとソフトの選び方",
+          "hook": "最小の版でVRAM 19GB、最大の版はRAM約426GB。まず自分のPCの数字を知るところから。",
+          "key_claims": [
+            {
+              "text": "最小のGLM 4.7 Flashは4-bit量子化でVRAM 19GBが必要。最大のGLM 5.3はMoEオフロード使用時にVRAM 13GBとRAM約426GB。最も安く動かせるデバイスはRadeon RX 7900 XTXで約¥364,070",
+              "source_idx": 23,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM 5.2(753B)は2-bitなら256GBのMac Studioに収まり、4-bitは512GB必要、速度は3〜9 tok/s",
+              "source_idx": 16,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "744BのGLM-5.2も量子化とオフロードで25GB程度のRAM環境で動作は可能",
+              "source_idx": 15,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4.7は358BのMoEモデルでコンテキスト長202,752トークン、MITライセンス、API料金は入力0.6ドル・出力2.2ドル。Ollamaクラウド提供は終了しGGUFによるローカル実行が推奨されている",
+              "source_idx": 40,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "128並列時のスループットはTensorRT-LLM 541.9、vLLM 396.8、LM Studio 214.0 tokens/sec。1リクエスト時はLM Studioが最も速い",
+              "source_idx": 17,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GLM-4-32B-0414のGGUF形式モデルがHugging Faceで公開されている",
+              "source_idx": 33,
+              "source_tier": "AA",
+              "confidence": "medium"
+            },
+            {
+              "text": "GLM-5.3はベンチマーク首位だが重みの公開は延期された",
+              "source_idx": 6,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "CPUのみではTinyLlama 1.1Bが0.23 tokens/sec、RTX 4090では同モデルで約90 tokens/secが期待できる",
+              "source_idx": 18,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "GPUを使うと同じモデルが2〜3倍速くなり、毎日使うなら自宅GPUが割安",
+              "source_idx": 9,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "エントリー構成は約2,000ドルでRTX 3090×2枚",
+              "source_idx": 8,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "70B級の巨大モデルでもツールを1回も呼べなければエージェントとしては役に立たない",
+              "source_idx": 5,
+              "source_tier": "B",
+              "confidence": "low"
+            },
+            {
+              "text": "LM Studioは敷居が低く簡単に扱える。ローカルLLMはPCスペックとモデル選定が大事",
+              "source_idx": 12,
+              "source_tier": "B",
+              "confidence": "low"
+            }
+          ],
+          "tone": "実践的で具体的。数字を自分のPCと比べられるように",
+          "estimated_turns": 26
+        }
+      ],
+      "conclusion_message": "自分のPCに載る大きさのGLMを選び、データを外に出さない形で動かす。その一歩目は、VRAMとRAMを調べて、載るモデルを一つ動かしてみること。"
+    },
+    "segments": [
+      {
+        "segment_type": "intro",
+        "topic_index": null,
+        "title": "イントロ: あなたのPCが最強のAIアシスタントに？ローカルLLM「GLM」で叶う、プライバシー完全保護の未来",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "四国めたん、聞いてほしいのだ。AIチャットに仕事の資料を貼ろうとして、送信ボタンの前で手が止まったんだよ。これ、外のサーバーに送っていいのかなって。"
+          },
+          {
+            "speaker": "B",
+            "text": "その迷いは企業でも同じですわ。機密情報をクラウドに出せない、閉じたネットワークから外に通信できない、という理由で生成AIの導入を見送る企業は少なくありませんの。医療・金融・公共・製造では特に深刻ですわ。[src=20]"
+          },
+          {
+            "speaker": "A",
+            "text": "だったら、AIのほうを自分の手元に連れてくればいいんだよね。自分のPCや社内サーバーで動かすのがローカルLLMで、機密情報を外部のクラウドに送らずに使えるのだ。[src=14]"
+          },
+          {
+            "speaker": "B",
+            "text": "その通りですわ。そして今日の主役は、そのローカルLLMの中でも「GLM」というシリーズですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "番組の切り口は「あなたのPCが最強のAIアシスタントに？ローカルLLM『GLM』で叶う、プライバシー完全保護の未来」。大きく出たなあ。どうすればそこに近づけるのか、具体的な数字で確かめたいのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、今日は三つの順番で進めますわ。GLMとはどんなモデルの家族なのか。データを外に出さない現場はどう組んでいるのか。そして家のPCで動かすには何GBのメモリが要るのか、ですの。"
+          },
+          {
+            "speaker": "A",
+            "text": "「何を」「どこに置いて」「何で動かすか」の三段構えだね。数字がたくさん出てくるから、メモを用意して聞くといいよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "では、GLMの素顔から見ていきましょう。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 0,
+        "title": "GLMとは何者か：355Bの巨大モデルから9Bの小型モデルまで",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "まず名前からなのだ。GLMはGeneral Language Modelの略で、Z.aiが開発しているオープンウェイトの大規模言語モデルのシリーズだよね。最初のモデルは2021年に公開されたんだって。[src=22]"
+          },
+          {
+            "speaker": "B",
+            "text": "よく調べていますわね。開発元の表記は記事によって違っていて、Zhipu AIと清華大学の名前を挙げるもの [src=25]、清華大学KEG研究所、略称THUDMとするものがありますわ。[src=35] GLM-4.7はZ.aiが公開したモデルですの。[src=40]"
+          },
+          {
+            "speaker": "A",
+            "text": "呼び名はいろいろでも、同じGLMの系譜ってことだね。で、気になるのは大きさなのだ。AIって、大きいほど賢いんでしょ？"
+          },
+          {
+            "speaker": "B",
+            "text": "そこが面白いところですわ。GLM-4.5は総パラメータが355BのMoE、つまり混合専門家型のモデルですが、実際に働くアクティブパラメータは32Bですの。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "355Bのうち32B！ 例えるなら、大きな病院に専門の先生が大勢いて、症状に合わせて担当の先生だけが診察室に入る感じかな。全員が一度に診るわけじゃないんだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "「混合専門家」という名前によく合う例えですわ。同じ記事は比較として、GPT-3が175B、BERTが340Mという数字を並べ、GLM-4.5はGPT-3より高精度な処理ができるとしていますの。Air版は106Bですわ。[src=19]"
+          },
+          {
+            "speaker": "A",
+            "text": "でも反論するよ。355Bなんて、家のPCで動かす話とは別世界じゃないの？"
+          },
+          {
+            "speaker": "B",
+            "text": "良い反論ですわ。そこで32Bクラスの出番です。GLM-4-32Bは32Bパラメータで、15兆トークンのデータで学習され、OpenAIのGPT系やDeepSeekのV3、R1に匹敵する性能とされていますの。コンテキスト長は32,768トークンですわ。[src=25]"
+          },
+          {
+            "speaker": "A",
+            "text": "「匹敵する」は心強いけど、点数は出ているのかな。うたい文句なのか、測った結果なのかで重みが違うのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "鋭いですわね。「匹敵する」は配布ページにもある表現ですが [src=33]、比較の点数は今回の資料では確認できませんでした。ここは割り引いて聞いてくださいな。"
+          },
+          {
+            "speaker": "A",
+            "text": "点数がはっきりしているのは9Bクラスのほうだよね。glm-4-9bは90億パラメータで、MMLUが74.7%、C-Evalが77.1%、GSM8Kが84.0%、HumanEvalが70.1%なのだ。[src=21]"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ。一方でMATHは30.4%ですから、項目による差が大きいですわね。コンテキストウィンドウは8Kトークンですの。[src=21]"
+          },
+          {
+            "speaker": "A",
+            "text": "長い文書を丸ごと読ませるなら8Kは狭そうだなあ。さっきの32Bクラスは32,768トークンだったから、用途で選び分けることになるね。[src=25]"
+          },
+          {
+            "speaker": "B",
+            "text": "その見方で合っていますわ。さらに9Bクラスには驚きの報告があって、画像も扱えるGLM-4.1V-9B-Thinkingは、18のベンチマークで72BパラメータのQwen-2.5-VL-72Bと同等かそれ以上の性能を示したとされていますの。最大4Kの解像度の画像を処理できますわ。[src=39]"
+          },
+          {
+            "speaker": "A",
+            "text": "9Bが72Bと互角というのは、軽自動車が大型トラックと同じ荷物を運んだような話なのだ。ただ、どのベンチマークで比べたのかは知りたいところだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "そこはモデルを掲載するサービスのページの説明で、ベンチマークの内訳までは書かれていませんの。数字の出どころとして覚えておきましょう。[src=39]"
+          },
+          {
+            "speaker": "A",
+            "text": "小さい系統はほかにもあるよ。GLM-Z1-9Bは90億パラメータで、同じサイズのオープンソースモデルの中で総合性能が上位なのだ。[src=36]"
+          },
+          {
+            "speaker": "B",
+            "text": "推論に時間をかける系統もありますわ。GLM-Z1-32Bは「熟考」の仕組みで、より長い時間をかけた推論ができますの。GLM-4-32BとGLM-Z1-32Bは、2025年にOpenRouterで無料公開されましたわ。[src=35]"
+          },
+          {
+            "speaker": "A",
+            "text": "無料で触れる入口があるのは助かるなあ。まず試して、自分の用途に合うか確かめられるもんね。"
+          },
+          {
+            "speaker": "B",
+            "text": "ライセンスの面でも扱いやすくて、GLM-4-32BはMITライセンスですわ。[src=25]"
+          },
+          {
+            "speaker": "A",
+            "text": "ここまでを整理するのだ。GLMは355Bの巨大モデルから9Bの小型モデルまで揃った家族で、家のPCで狙うなら32Bか9Bのクラス。点数が細かく出ているのは9B、というのが今の地図だね。"
+          },
+          {
+            "speaker": "B",
+            "text": "見事な地図ですわ。続いて、そのモデルをどこに置くかの話に移りましょう。"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 1,
+        "title": "データを外に出さない現場：銀行とメーカーはどう組んだか",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "置き場所といえば、銀行がローカルLLMを使い始めた事例を見つけたのだ。常陽銀行が、松尾研発スタートアップのAthena Technologiesと組んだ話だよ。[src=11]"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、「JOYO AI AGENT」という専門業務特化型のエージェントですわね。機密情報を外部に送信しないローカルLLMで、銀行業務の効率化を図っていますの。[src=11]"
+          },
+          {
+            "speaker": "A",
+            "text": "銀行はお金と個人情報のかたまりだもんね。どうやって安全にしたの？"
+          },
+          {
+            "speaker": "B",
+            "text": "鍵は置き場所ですわ。外部の生成AIサービスを使わず、インターネット環境から物理的に分離された閉域クラウドの上にローカルLLMを構築しましたの。環境はAzure VNetですわ。[src=11]"
+          },
+          {
+            "speaker": "A",
+            "text": "あれ、クラウドなんだ。「ローカル」って自分の机のPCのことだと思っていたのだ。金庫を自宅に置くんじゃなくて、貸金庫の部屋を丸ごと自分専用に借り切る、みたいな形だね。"
+          },
+          {
+            "speaker": "B",
+            "text": "上手な例えですわ。大事なのは機密情報を外部のクラウドに送らないことで、自分のPCや社内サーバーもローカル環境に入りますの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "でも一つ引っかかるよ。この銀行が使っているモデルはGLMなの？"
+          },
+          {
+            "speaker": "B",
+            "text": "モデル名は今回の資料に書かれていませんわ。ですからGLMの実績としてではなく、データを外に出さない方式が銀行の実務で通用した例として受け取ってくださいな。"
+          },
+          {
+            "speaker": "A",
+            "text": "了解なのだ。時期も具体的で、PoCの開始が2025年7月、翻訳とマスキングの機能は2026年3月に導入予定となっているね。[src=11]"
+          },
+          {
+            "speaker": "B",
+            "text": "製造業にも例がありますわ。住友電工は、社内のGPUサーバー群の上でローカルLLMを実行する統合プラットフォームに取り組んでいますの。[src=4]"
+          },
+          {
+            "speaker": "A",
+            "text": "効果の数字も拾ってきたよ。金融機関が融資業務に特化したローカルLLMで応答精度が130%向上した例と、印刷会社がローカルLLMへ切り替えて業務時間を約30%削減した例なのだ。[src=14]"
+          },
+          {
+            "speaker": "B",
+            "text": "業務時間の約30%は大きいですわね。"
+          },
+          {
+            "speaker": "A",
+            "text": "うん、30%削減はイメージしやすいよ。でも130%向上のほうは、何を基準にどう測ったのか気になるなあ。"
+          },
+          {
+            "speaker": "B",
+            "text": "基準と測り方は記事に示されていませんの。大きな数字ほど基準が大事ですから、ここは参考程度に留めましょう。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "設備の話もしておきたいのだ。会社で本格的にやる場合、VRAMが48GB以上の業務用GPUがよく使われて、GPUサーバーの初期費用はおおむね200万円から500万円くらいだよ。[src=14]"
+          },
+          {
+            "speaker": "B",
+            "text": "個人には重い金額ですわね。けれど同じ記事は、量子化という技術でモデルを数GBの規模まで縮小でき、一般的なPCでも実行できるとしていますわ。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "量子化は、荷物を圧縮袋に入れてスーツケースに詰めるイメージで聞いておくよ。会社は大きなトランク、個人は機内持ち込みサイズ、という住み分けだね。"
+          },
+          {
+            "speaker": "B",
+            "text": "日本語向けの選択肢も挙がっていますわ。ELYZAやrinna、サイバーエージェントが日本語向けのモデルを開発していますの。[src=14]"
+          },
+          {
+            "speaker": "A",
+            "text": "じゃあ切り口の「プライバシー完全保護」に戻るのだ。ボクの理解では、答えは「外部に送らない置き場所を自分で選べる」こと。銀行は閉域クラウド、メーカーは社内サーバー、そして個人は自分のPC、だね。"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、そこがローカルLLMの強みですわ。あわせて、導入には環境の準備と運用方針の検討が必要ですの。[src=14]"
+          }
+        ]
+      },
+      {
+        "segment_type": "deep_dive",
+        "topic_index": 2,
+        "title": "家のPCでGLMを動かす：必要なVRAM・RAMとソフトの選び方",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "いよいよ家のPCの話なのだ！ 最初に知りたいのは、ずばり何GBあれば動くのか、だよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "バージョン別の必要VRAMをまとめた一覧がありますわ。ローカルで動かせるGLMのバージョンは五つあって、最小のGLM 4.7 Flashは4-bit量子化でVRAMが19GB必要ですの。[src=23]"
+          },
+          {
+            "speaker": "A",
+            "text": "19GBかあ。まず自分のグラフィックボードの型番を調べなきゃ。同じ一覧には、いちばん安く動かせるデバイスはRadeon RX 7900 XTXで、約364,070円とあるのだ。[src=23]"
+          },
+          {
+            "speaker": "B",
+            "text": "反対に最大のGLM 5.3はMoEモデルで、MoEオフロードを使うとVRAMは13GBで済みますが、RAMが約426GB必要ですわ。[src=23]"
+          },
+          {
+            "speaker": "A",
+            "text": "VRAMは小さくて済むのにRAMが約426GBって、作業机は小さくていいけど倉庫が体育館サイズ、みたいな話だね。ボクのPCのメモリとは桁が違うのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "GLM-5.3には経緯もありますの。ベンチマークで首位を取ったものの重みの公開は延期された、と8月に報じられましたわ。[src=6] 一覧のほうは10月の更新でGLM 5.3を載せていますの。[src=23]"
+          },
+          {
+            "speaker": "A",
+            "text": "一つ前のGLM-5.2も調べたよ。パラメータ数は744Bとする記事と753Bとする記事があって [src=15] [src=16]、2-bitまで量子化すると256GBのMac Studioに収まるのだ。4-bitなら512GBが必要だって。[src=16]"
+          },
+          {
+            "speaker": "B",
+            "text": "速度は毎秒3から9トークンほどですわ。[src=16] 別の記事は、量子化とオフロードを使えば25GB程度のRAM環境でも「動作」は可能としたうえで、実務で使える推論速度かどうかを問題にしていますの。[src=15]"
+          },
+          {
+            "speaker": "A",
+            "text": "動くのと使えるのは別、ということだね。速度の感覚をつかむ数字もあるよ。GPUなしのCPUだけだと、TinyLlamaという小さなモデルでも実測で毎秒0.23トークン。RTX 4090なら同じモデルで毎秒約90トークンが期待できる、という参考値なのだ。[src=18]"
+          },
+          {
+            "speaker": "B",
+            "text": "大きな開きですわね。別の実測でも、GPUを使うと同じモデルが2倍から3倍速くなり、毎日使うなら自宅のGPUのほうが割安だったそうですわ。[src=9]"
+          },
+          {
+            "speaker": "A",
+            "text": "となると、狙い目はGPUに載る大きさのモデルだね。さっきの32BクラスのGLM-4-32Bには、GGUF形式のモデルがHugging Faceで公開されているのだ。[src=33]"
+          },
+          {
+            "speaker": "B",
+            "text": "GGUFはローカル実行用のモデルファイル形式ですわ。GLM-4.7のほうも、Ollamaのクラウド提供が終了して、GGUFによるローカル実行が推奨されていますの。[src=40]"
+          },
+          {
+            "speaker": "A",
+            "text": "そのGLM-4.7は358BのMoEモデルで、コンテキスト長が202,752トークン、ライセンスはMITだよね。[src=40] 長い資料を読ませたい人には魅力的な数字だなあ。"
+          },
+          {
+            "speaker": "B",
+            "text": "動かすソフトも押さえましょう。ローカルLLMの推論ランタイムとしてllama.cpp、Ollama、LM Studioがあり [src=14]、Janという実行アプリもありますわ。[src=33]"
+          },
+          {
+            "speaker": "A",
+            "text": "体験記によると、LM Studioは敷居が低くて簡単に扱えたそうだよ。そのうえで結論は「PCスペックとモデル選定が大事」なのだ。[src=12]"
+          },
+          {
+            "speaker": "B",
+            "text": "エンジンの選び方にも数字がありますわ。ある検証では、1リクエストのときはLM Studioが最も速く、128並列になるとTensorRT-LLMが毎秒541.9トークン、vLLMが396.8、LM Studioが214.0でしたの。[src=17]"
+          },
+          {
+            "speaker": "A",
+            "text": "一人で使うならLM Studio、大勢が同時に使うならTensorRT-LLMやvLLM、という使い分けに見えるね。家で自分だけが使うなら、まずLM Studioから試すのがよさそうなのだ。"
+          },
+          {
+            "speaker": "B",
+            "text": "ただ、その検証で使われたのはGLMではなく別のモデルで、機材もDGX Spark互換機ですわ。数字そのものより、並列数で順位が変わるという傾向を持ち帰ってくださいな。[src=17]"
+          },
+          {
+            "speaker": "A",
+            "text": "お金の話もしておくよ。自作の例では、エントリー構成が約2,000ドルで、RTX 3090を2枚という組み方が紹介されているのだ。[src=8]"
+          },
+          {
+            "speaker": "B",
+            "text": "ローカルにこだわらない場合はAPIもありますわ。GLM-4.7の料金は入力が0.6ドル、出力が2.2ドルですの。[src=40] ただしAPIは外部のサービスですから、データを外に出さないという今日の目的とは別の使い方になりますわ。"
+          },
+          {
+            "speaker": "A",
+            "text": "選ぶ基準は大きさだけじゃないよね。70B級の巨大モデルを動かしても、ツールを1回も呼べなければエージェントとしては役に立たない、という指摘もあるのだ。[src=5]"
+          },
+          {
+            "speaker": "B",
+            "text": "ええ、パラメータ数よりツール呼び出し性能を見る、という考え方ですわね。[src=5] GLM 4.7 Flashにも、AIエージェントとしての性能を取り上げたレビューがありますわ。[src=13]"
+          },
+          {
+            "speaker": "A",
+            "text": "手順を三つに整理するのだ。一つ目、自分のPCのVRAMとRAMを調べる。二つ目、一覧で必要なVRAMを確かめて、載る大きさのモデルを選ぶ。最小のGLM 4.7 Flashなら19GBが目安だよ。[src=23] 三つ目、GGUFのモデルをLM Studioなどで読み込んで試す。[src=16]"
+          },
+          {
+            "speaker": "B",
+            "text": "良い順番ですわ。大きさを欲張らず、手元に載るものから始めるのが近道ですの。"
+          }
+        ]
+      },
+      {
+        "segment_type": "conclusion",
+        "topic_index": null,
+        "title": "まとめ: あなたのPCが最強のAIアシスタントに？ローカルLLM「GLM」で叶う、プライバシー完全保護の未来",
+        "turns": [
+          {
+            "speaker": "A",
+            "text": "今日の話を一本につなげるのだ。GLMは355Bの巨大モデルから9Bの小型モデルまで揃った家族で、小さいクラスにも点数や比較の報告が出ていたね。"
+          },
+          {
+            "speaker": "B",
+            "text": "置き場所については、機密情報を外部に送らない構成を自分で選べることが、プライバシーを守る土台でしたわ。銀行は閉域クラウド、メーカーは社内サーバーで実現していましたの。"
+          },
+          {
+            "speaker": "A",
+            "text": "そして家のPCでは、最小のGLM 4.7 FlashでVRAM 19GBが一つの目安。GGUFのモデルとLM Studioのようなソフトがあれば、手元で動かす道具はそろうんだよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "「あなたのPCが最強のAIアシスタントに？」という問いには、こう答えられますわ。自分のPCに載る大きさのGLMを選び、データを外に出さない形で動かす。その一歩目は、もう踏み出せるところにありますの。"
+          },
+          {
+            "speaker": "A",
+            "text": "最強かどうかは、自分の用途に合うかどうかで決まるもんね。ボクはまずVRAMを調べて、載るモデルを一つ動かしてみるよ。"
+          },
+          {
+            "speaker": "B",
+            "text": "番組で挙げた数字の出どころは、概要欄の参考資料にありますわ。試す前に、必要なVRAMとRAMをもう一度確かめてくださいな。"
+          },
+          {
+            "speaker": "A",
+            "text": "自分のデータを自分の手元で扱えるAI、楽しみになってきたのだ！"
+          },
+          {
+            "speaker": "B",
+            "text": "それでは、今日はここまでですわ。ごきげんよう。"
+          }
+        ]
+      }
+    ],
+    "metrics": {
+      "intro": {
+        "prompt_chars": 0,
+        "output_chars": 580,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_0": {
+        "prompt_chars": 0,
+        "output_chars": 1821,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_1": {
+        "prompt_chars": 0,
+        "output_chars": 1393,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "deep_dive_2": {
+        "prompt_chars": 0,
+        "output_chars": 2234,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      },
+      "conclusion": {
+        "prompt_chars": 0,
+        "output_chars": 515,
+        "elapsed_sec": 0.0,
+        "attempts": 1,
+        "used_fallback": false
+      }
+    }
+  },
+  "metrics": {
+    "total_numbers_extracted": 75,
+    "matched_to_structured_facts": 47,
+    "matched_ratio": 0.6266666666666667,
+    "highly_specific_count": 39,
+    "highly_specific_unmatched": 15,
+    "false_positive_candidates": 28,
+    "citation_tags_total": 57,
+    "citation_tags_normalized": 57,
+    "citation_tags_inconsistent": 0
+  },
+  "warnings": [
+    {
+      "code": "unmatched_number",
+      "message": "'15兆' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'72' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'72' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'72' が structured_facts に見当たりません",
+      "location": "deep_dive_0"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'200万' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'200万' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'500万' が structured_facts に見当たりません",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'500万' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_1"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'19' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'19' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'7900' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'7900' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'364,070円' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'364,070円' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'13' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'426' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'426' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'426' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'426' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'744' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'744' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'753' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'753' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'256' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'256' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'512' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'512' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'25' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'0.23' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'0.23' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'4090' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'4090' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'90' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'2倍' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'3倍' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'128' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'128' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'2,000ドル' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'2,000ドル' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'3090' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "highly_specific_unmatched",
+      "message": "'3090' は highly_specific かつ structured_facts に未登録 (false-positive 候補)",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'19' が structured_facts に見当たりません",
+      "location": "deep_dive_2"
+    },
+    {
+      "code": "unmatched_number",
+      "message": "'19' が structured_facts に見当たりません",
+      "location": "conclusion"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[3] (src=21) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['90']",
+      "location": "topic_0_claim_3"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[0].key_claims[5] (src=36) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['9', '90']",
+      "location": "topic_0_claim_5"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[0] (src=11) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['2025', '7']",
+      "location": "topic_1_claim_0"
+    },
+    {
+      "code": "source_attribution_mismatch",
+      "message": "topic[1].key_claims[1] (src=14) の数値・固有名詞が structured_facts にも source snippet にも 見当たりません: unmatched_numbers=['200', '500']",
+      "location": "topic_1_claim_1"
+    }
+  ],
+  "metadata": {
+    "title": "ローカルLLM「GLM」を自分のPCで動かす：必要なVRAMとRAM、データを外に出さない組み方",
+    "thumbnail_title": "GLMは何GBで動く？",
+    "description": "AIチャットに仕事の資料を送るのは不安。それならAIを手元で動かせばいい――ローカルLLM「GLM」シリーズを、数字で確かめながら解説します。355Bの巨大モデルから9Bの小型モデルまでの顔ぶれとベンチマークの点数、銀行やメーカーが「データを外に出さない」ためにどこへ置いたのか、そして家のPCで動かすのに必要なVRAM・RAM・ソフトまで。\n\n【目次】\n1. GLMとは何者か：355Bの巨大モデルから9Bの小型モデルまで\n2. データを外に出さない現場：銀行とメーカーはどう組んだか\n3. 家のPCでGLMを動かす：必要なVRAM・RAMとソフトの選び方\n\n最小のGLM 4.7 FlashはVRAM 19GBが目安。まず自分のPCのVRAMとRAMを調べるところから始められます。",
+    "hashtags": [
+      "ローカルLLM",
+      "GLM",
+      "VRAM",
+      "LM Studio",
+      "GGUF",
+      "量子化",
+      "プライバシー",
+      "生成AI",
+      "自宅PC",
+      "AI活用"
+    ],
+    "chapters": [
+      {
+        "timestamp": "00:00",
+        "title": "イントロ"
+      },
+      {
+        "timestamp": "00:40",
+        "title": "GLMとは何者か：355Bの巨大モデルから9Bの小型モデルまで"
+      },
+      {
+        "timestamp": "02:30",
+        "title": "データを外に出さない現場：銀行とメーカーはどう組んだか"
+      },
+      {
+        "timestamp": "04:10",
+        "title": "家のPCでGLMを動かす：必要なVRAM・RAMとソフトの選び方"
+      },
+      {
+        "timestamp": "06:10",
+        "title": "まとめ"
+      }
+    ],
+    "references": [
+      {
+        "url": "https://www.hitachi-solutions.co.jp/katsubun/column/generative_ai004/",
+        "title": "ローカルLLMとは？オンプレミス環境で実現する、セキュリティを確保した生成AI導入・活用の解決策 | 活文 | 日立ソリューションズ",
+        "tier": "B",
+        "published_date": "2026-04-17"
+      },
+      {
+        "url": "https://www.videor.co.jp/system-solution/column/column19.html",
+        "title": "ローカルLLMのメリット・課題・活用事例｜機密データを守る生成AI運用",
+        "tier": "B",
+        "published_date": "2026-01-27"
+      },
+      {
+        "url": "https://en.wikipedia.org/wiki/GLM-4.5?no_redirect=true",
+        "title": "GLM (AI)",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://aiwiki.ara-tech.jp/ja/models/glm-4-32b/",
+        "title": "GLM-4-32B-0414 - AIwiki",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://news.aibase.com/ja/news/17380",
+        "title": "GLM-4-32BとGLM-Z1-32BがOpenRouterで公開、無料開放",
+        "tier": "B",
+        "published_date": "2025-04-22"
+      },
+      {
+        "url": "https://www.issoh.co.jp/tech/details/10576/",
+        "title": "GLM-4.7とは？358B MoEの仕様と料金・GLM-5.2との使い分け",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://peaky.co.jp/glm-45/",
+        "title": "GLM-4.5 – 大規模言語モデルを活用したオープンソースAI推論エンジン | Peaky AI LAB",
+        "tier": "B",
+        "published_date": "2025-07-31"
+      },
+      {
+        "url": "https://huggingface.co/unsloth/GLM-4-32B-0414-GGUF",
+        "title": "unsloth/GLM-4-32B-0414-GGUF · Hugging Face",
+        "tier": "AA",
+        "published_date": null
+      },
+      {
+        "url": "https://www.aimodels.fyi/models/huggingFace/glm-4-9b-thudm",
+        "title": "glm-4-9b: Text-to-Text model — overview, use cases, alternatives",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://www.siliconflow.com/ja/models/glm-4-1v-9b-thinking",
+        "title": "GLM-4.1V-9B-Thinking - Model情報、パラメータ、ベンチマーク ...",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://model.aibase.com/ja/models/details/1924734720340660224",
+        "title": "GLM-4-32B-0414オープンソースAIモデル - GPTに匹敵し、ローカルデプロイをサポートする実用的な大規模モデル",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://athenatech.jp/case/joyo-closed-agent-platform",
+        "title": "【ローカルLLM導入事例】機密情報の保護と業務効率化を両立するAI活用｜松尾研発スタートアップAthena、株式会社常陽銀行向けに機密情報を外部送信しないローカルLLMで銀行業務を効率化｜Athena Technologies, Inc.",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://sumitomoelectric.com/jp/sites/japan/files/2026-07/download_documents/J209-04.pdf",
+        "title": "社内サーバ上で実行するローカルLLM統合プラットフォームの取り組み",
+        "tier": "B",
+        "published_date": null
+      },
+      {
+        "url": "https://vramglass.com/ja/model/glm",
+        "title": "GLM をローカルで動かすには？バージョン別の必要VRAM一覧（2026）",
+        "tier": "B",
+        "published_date": "2026-10-03"
+      },
+      {
+        "url": "https://geek-terminal.com/archives/1035",
+        "title": "【geek-terminalニュース】GLM-5.3がベンチマーク首位も重み公開延期、ローカルLLM勢は指をくわえて待つのみ | Geek Terminal",
+        "tier": "B",
+        "published_date": "2026-08-20"
+      },
+      {
+        "url": "https://ai.negi-lab.com/posts/glm-5-2-local-llm-pc-guide-rtx-mac/",
+        "title": "ローカルLLMの頂点GLM-5.2を家庭用PCで動かす推奨構成：RTX 4090かMac Studioか？ | Negi AI Lab",
+        "tier": "B",
+        "published_date": "2026-07-11"
+      },
+      {
+        "url": "https://ofox.ai/ja/blog/glm-5-2-run-locally-gguf-2026/",
+        "title": "GLM 5.2 をローカルで動かす（2026 年版）— 256GB Mac や 4090 マシンで 2-bit 実行",
+        "tier": "B",
+        "published_date": "2026-06-23"
+      },
+      {
+        "url": "https://linuxlab.jp/2026/06/17/bench-gpu-llm-inference/",
+        "title": "GPU別ローカルLLM推論速度を実測比較【RTX4090/3090/A100】 | Linuxらぼ",
+        "tier": "B",
+        "published_date": "2026-06-16"
+      },
+      {
+        "url": "https://linuxlab.jp/2026/06/18/bench-vps-vs-home-llm/",
+        "title": "ローカルLLMをVPSと自宅GPUで動かしコストと速度を実測比較 | Linuxらぼ",
+        "tier": "B",
+        "published_date": "2026-06-17"
+      },
+      {
+        "url": "https://note.com/aoki_monpro/n/n1f8e99601fcf",
+        "title": "ローカルLLMはPCスペックとモデル選定が大事｜青木亮宏(世界のアオキ) | テイルウインド株式会社 | 生成AI仕様駆動開発",
+        "tier": "B",
+        "published_date": "2025-04-09"
+      },
+      {
+        "url": "https://qiita.com/yugulab/items/52e9e5cc4ed95d4a041f",
+        "title": "あなたのローカルLLMは、まだ本気を出していない #LMStudio - Qiita",
+        "tier": "B",
+        "published_date": "2026-02-18"
+      },
+      {
+        "url": "https://labmemo.com/local-llm-sota-guide-jamesob-2026/",
+        "title": "ローカルLLM自作完全ガイド：jamesob/local-llmに学ぶSOTAモデル運用の実践（$2K〜$40K構成）",
+        "tier": "B",
+        "published_date": "2026-07-03"
+      },
+      {
+        "url": "https://upppp.jp/ai-model/20260613-132552/",
+        "title": "ローカルLLM選びはパラメータ数よりツール呼び出し性能を見る | upppp",
+        "tier": "B",
+        "published_date": "2026-06-13"
+      },
+      {
+        "url": "https://note.com/masa_wunder/n/n41bfbee5c7c5",
+        "title": "【決定版】GLM 4.7 Flashレビュー：AIエージェント性能はガチか？DeepSeekより安い激コスパモデル｜まさお@未経験からプロまでAI活用",
+        "tier": "B",
+        "published_date": "2026-01-19"
+      }
+    ]
+  }
+}
