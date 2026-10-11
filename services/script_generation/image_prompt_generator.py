@@ -31,26 +31,48 @@ class ImagePromptGenerator:
     # Issue #4 fix: Derive from centralized constants
     DEFAULT_COLOR_PALETTE = f"{DEFAULT_PRIMARY_COLOR} and {DEFAULT_SECONDARY_COLOR} neon lighting"
     
-    SYSTEM_PROMPT_TEMPLATE = """You are a professional cinematographer creating SUBJECT-DRIVEN, narrative-focused shots for AI image generation.
+    # Prepended by code to every segment prompt (LLM output and fallbacks alike), so the
+    # constraint sits at the head of the prompt instead of relying on the LLM to end with it.
+    SEGMENT_PROMPT_PREFIX = (
+        "An unpopulated scene with no people, no hands, no faces, "
+        "and no text, lettering, signage, labels or screen interfaces: "
+    )
 
-Your task is to generate a detailed English prompt for FLUX.1 that visualizes the CONCRETE SUBJECTS discussed in the radio script segment.
+    # Upper bound for the final segment prompt (prefix included). FLUX.1 [schnell] is trained
+    # with 256 T5 tokens; ComfyUI pads to 256 but does not truncate, so longer prompts run
+    # out of distribution. Measured with ComfyUI's T5 tokenizer on 501 past segment prompts:
+    # every prompt up to 1,135 chars stayed within 256 tokens (max 233), every prompt from
+    # 1,398 chars up exceeded it (median 3.95 chars/token). Longer output is discarded in
+    # favour of the fixed fallback, never truncated.
+    MAX_SEGMENT_PROMPT_CHARS = 1000
 
-PRIMARY FOCUS (MANDATORY - This is your HIGHEST priority):
-1. IDENTIFY CONCRETE SUBJECTS from the script:
-   - What specific objects, tools, devices, or phenomena are being discussed?
-   - What actions, processes, or events are being described?
-   - What people, professions, or roles are mentioned?
-   - What data, measurements, or visual information is referenced?
+    SYSTEM_PROMPT_TEMPLATE = """You are a professional cinematographer creating SCENE-DRIVEN, text-free still-life and environment shots for AI image generation.
 
-2. DESCRIBE SUBJECTS WITH PRECISION:
-   - Be SPECIFIC: Instead of "medical facility", describe "a doctor examining a patient's continuous glucose monitor display"
-   - Be DETAILED: Instead of "technology", describe "a smartphone app showing real-time blood sugar graphs with trend arrows"
-   - Be CONCRETE: Instead of "research", describe "a scientist analyzing DNA sequencing data on multiple screens"
+Your task is to generate a detailed English prompt for FLUX.1 that evokes what the radio script segment is about through a PLACE, PHYSICAL OBJECTS, LIGHT, and COMPOSITION - with no people and no text anywhere in the frame.
 
-3. START YOUR PROMPT WITH THE SUBJECT:
-   - Begin with the most visually representative subject from the script
-   - Make the subject the HERO of the composition
-   - The subject should occupy the primary visual focus
+ABSOLUTE RULES (MANDATORY - these override everything else):
+1. NO PEOPLE:
+   - NO people, hands, fingers, faces, silhouettes, or body parts of any kind
+   - Imply human presence only through objects and light: an empty chair, a tool left on a bench, a lamp left on, a door ajar
+2. NO TEXT OR TEXT-BEARING SURFACES:
+   - NO text, letters, numbers, captions, signage, labels, logos, or watermarks
+   - NO screens, monitors, phone or tablet displays, apps, or user interfaces
+   - NO documents, books with visible pages, papers, charts, graphs, diagrams, maps, code, or data visualizations
+   - Devices may appear only switched off or seen from behind/side, with no visible display content
+3. NEVER TRANSCRIBE THE SCRIPT:
+   - Do NOT copy names, product names, figures, statistics, or quotes from the script into the prompt
+   - Translate the idea into a physical scene instead
+
+PRIMARY FOCUS:
+1. IDENTIFY THE CORE IDEA of the segment, then choose ONE physical scene that symbolizes it:
+   - A place: a room, workshop, studio, laboratory, street, landscape
+   - Tangible objects: instruments, tools, machines, materials, natural elements
+2. DESCRIBE THE SCENE WITH PRECISION:
+   - Be SPECIFIC about objects, materials, and surfaces: name the exact object, what it is made of, its condition, and what it rests on - never a generic category such as "technology" or "research"
+   - Let LIGHT carry the mood: direction, color, contrast, reflections, haze
+   - Let COMPOSITION carry the meaning: scale, distance, symmetry, emptiness, depth
+3. START YOUR PROMPT WITH THE MAIN OBJECT OR PLACE:
+   - Make it the hero of the composition
 
 UNIFIED VISUAL BRAND (MANDATORY - Apply consistently):
 - Color Palette: {color_palette}
@@ -61,31 +83,33 @@ NARRATIVE GUIDANCE:
 {composition_guidance}
 
 CREATIVE FREEDOM:
-- Camera angles, distances, and framing: YOUR CHOICE to best showcase the subject
+- Camera angles, distances, and framing: YOUR CHOICE to best showcase the scene
 - Lighting style and mood: YOUR CHOICE to support the narrative
-- Supporting elements and context: YOUR CHOICE to enrich the scene
+- Supporting objects and setting: YOUR CHOICE to enrich the scene
 
 CONSTRAINTS (MANDATORY):
-- ALWAYS start with a SPECIFIC, CONCRETE subject description (not abstract spaces)
+- ALWAYS start with a SPECIFIC physical object or place
 - ALWAYS incorporate the color palette and aesthetic
 - Use ONLY the Color Palette given above — NEVER reuse colors from the EXAMPLE
   OUTPUTS below (their colors are placeholders illustrating structure only)
-- ALWAYS end with: "no text, no writing, no watermarks"
 - ALWAYS include film quality keywords
+- Do NOT write "no text" or "no people" yourself — that constraint is added automatically
+- Keep the prompt to ONE paragraph of 60-110 words
 
 OUTPUT FORMAT:
-Return ONLY the English prompt text, no explanations.
+Return ONLY the English prompt text, with no explanations and no surrounding quotation marks.
+DO NOT include any Japanese characters in your output.
 
-EXAMPLE OUTPUTS (Subject-Driven):
+EXAMPLE OUTPUTS (Scene-Driven, no people, no text):
 
 Example 1 (Medical Topic):
-"A doctor in a white coat examining a patient's continuous glucose monitor display showing real-time blood sugar data with trend arrows and alerts, with an insulin pump visible on the patient's belt and medical charts on a tablet nearby, bathed in soft teal and warm coral neon glow, Clean Minimalist Modern aesthetic, clinical and high-tech atmosphere, shot on Kodak Portra 400 film, subtle film grain, highly detailed, no text"
+A small glucose sensor patch and a capped insulin pen resting on a folded linen cloth beside a glass of water on a bedside table, an unmade bed and a softly glowing lamp in the background suggesting someone has just left the room, bathed in soft teal and warm coral neon glow, Clean Minimalist Modern aesthetic, calm and intimate atmosphere, shallow depth of field, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 
 Example 2 (Technology Topic):
-"A software engineer's hands typing code on a laptop with multiple terminal windows showing AI model training progress bars and loss curves, surrounded by reference books on machine learning and a whiteboard with neural network diagrams, bathed in golden amber and deep violet neon glow, Clean Minimalist Modern aesthetic, focused and innovative atmosphere, shot on Kodak Portra 400 film, subtle film grain, highly detailed, no text"
+A long aisle of server racks receding into darkness in an empty data hall, bundled fiber cables arcing overhead and thin haze catching beams of light between the cabinets, a single office chair pushed back from the aisle, bathed in golden amber and deep violet neon glow, Clean Minimalist Modern aesthetic, quiet and focused atmosphere, symmetrical wide shot with strong depth, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 
 Example 3 (Environmental Topic):
-"A climate scientist analyzing satellite imagery of melting ice caps on a large monitor, with data visualization showing temperature anomalies and CO2 concentration graphs, research papers and core sample tubes on the desk, bathed in emerald green and ice blue neon glow, Clean Minimalist Modern aesthetic, urgent and analytical atmosphere, shot on Kodak Portra 400 film, subtle film grain, highly detailed, no text"
+A row of cylindrical ice core samples laid on a steel workbench inside a cold research hut, frost on the window and a pair of insulated gloves left beside a thermos, pale daylight spilling across the melting ice, bathed in emerald green and ice blue neon glow, Clean Minimalist Modern aesthetic, urgent and contemplative atmosphere, close still-life framing, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 """
     
     THUMBNAIL_SYSTEM_PROMPT_TEMPLATE = """You are a professional cinematographer specializing in creating ABSTRACT, METAPHORICAL, and ATMOSPHERIC YouTube thumbnail backgrounds for radio content.
@@ -197,8 +221,8 @@ Example 3 (Environmental Topic):
             composition_guidance=composition_guidance
         )
         
-        # Build user message with subject-extraction emphasis
-        user_message = f"""Generate a SUBJECT-DRIVEN cinematic image prompt for this radio segment.
+        # Build user message with scene-translation emphasis
+        user_message = f"""Generate a SCENE-DRIVEN cinematic image prompt for this radio segment.
 
 Segment Type: {segment.segment_type}
 Topic: {segment.topic_title or "General discussion"}
@@ -207,11 +231,11 @@ Script Content:
 {segment_context}
 
 INSTRUCTIONS:
-1. Read the script carefully and identify the MOST CONCRETE, VISUALLY REPRESENTATIVE subjects being discussed
-2. Choose the subject that best symbolizes the segment's core message
-3. Describe that subject with MAXIMUM SPECIFICITY at the start of your prompt
-4. Add the unified visual brand (colors, aesthetic, film quality) while keeping the subject as the hero
-5. Ensure the final prompt creates an image where viewers immediately understand what the segment is about
+1. Read the script and identify the CORE IDEA of the segment
+2. Choose ONE physical place or object arrangement that symbolizes that idea
+3. Describe it with MAXIMUM SPECIFICITY at the start of your prompt, expressing the idea through objects, light, and composition
+4. Add the unified visual brand (colors, aesthetic, film quality)
+5. No people, hands, or faces; no text, screens, documents, charts, or numbers; never copy names or figures from the script
 
 Generate the prompt now:"""
         
@@ -228,11 +252,21 @@ Generate the prompt now:"""
                 response_format="text",
             )
             llm_response = await self._llm_port.generate(llm_request)
-            prompt = llm_response.content.strip()
+            body = llm_response.content.strip().strip('"\'').strip()
+            if not body:
+                raise ValueError("LLM returned an empty image prompt")
 
-            # Ensure "no text, no writing, no watermarks" is at the end
-            if "no text" not in prompt.lower():
-                prompt += ", no text, no writing, no watermarks"
+            # Put the no-people / no-text constraint at the head of the prompt
+            prompt = self.SEGMENT_PROMPT_PREFIX + body
+
+            if len(prompt) > self.MAX_SEGMENT_PROMPT_CHARS:
+                # Runaway output: use the fixed fallback rather than a truncated prompt
+                logger.warning(
+                    f"Generated prompt too long for {segment.segment_id}: "
+                    f"{len(prompt)} chars > {self.MAX_SEGMENT_PROMPT_CHARS}, using fallback prompt"
+                )
+                console.print(f"[yellow]⚠ Prompt too long ({len(prompt)} chars), using fallback prompt[/yellow]")
+                return self._get_fallback_prompt(segment, identity)
 
             logger.info(f"Generated prompt: {prompt[:100]}...")
             console.print(f"[dim]Prompt: {prompt[:80]}...[/dim]")
@@ -476,39 +510,37 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
         """
         guidance_map = {
             "intro": """- Narrative Role: Scene-setting and topic introduction
-- Subject Focus: Show the PRIMARY TOOLS, OBJECTS, or SETTING that define this topic
-  * For medical topics: Show diagnostic devices, treatment tools, or patient-care equipment
-  * For technology topics: Show the core technology, devices, or interfaces being discussed
-  * For social topics: Show the people, environments, or artifacts central to the issue
+- Scene Focus: Show the PLACE and the KEY OBJECTS that define this topic, waiting and unattended
+  * For medical topics: an empty consultation room, instruments laid out on a tray, a made bed by a window
+  * For technology topics: the hardware itself - machines, cables, components, an empty workshop or server hall
+  * For social topics: the everyday place where the issue lives - an empty street, classroom, kitchen, or station
 - Visual Details to Emphasize:
-  * The main subject should be clearly identifiable and occupy 40-60% of frame
-  * Include contextual elements that establish the domain (lab equipment, office setting, etc.)
-  * Show the subject in a state of readiness or introduction (not mid-action)
-- Suggested Composition: Medium shot or establishing shot that clearly shows what the segment is about""",
+  * The main object or place should be clearly identifiable and occupy 40-60% of frame
+  * Include surrounding objects that establish the domain
+  * A state of readiness: everything in place, nobody present
+- Suggested Composition: Medium or establishing shot that clearly shows where the story takes place""",
             
             "deep_dive": """- Narrative Role: Detailed investigation and analysis
-- Subject Focus: Show SPECIFIC PROCESSES, DATA, or ACTIONS being analyzed
-  * For medical topics: Show detailed medical procedures, diagnostic data, treatment in action
-  * For technology topics: Show code, algorithms, data visualizations, or systems in operation
-  * For social topics: Show evidence, statistics, or concrete examples of the phenomenon
+- Scene Focus: Show the MECHANISM or MATERIAL at the heart of the topic, up close
+  * For medical topics: instruments, samples, vials, or equipment in fine physical detail
+  * For technology topics: internal components, circuitry, lenses, wiring, or machinery mid-process
+  * For social topics: a telling object or trace that embodies the phenomenon
 - Visual Details to Emphasize:
-  * Close-up or detail shots that reveal intricate aspects of the subject
-  * Include data, measurements, or visual information mentioned in the script
-  * Show active engagement: hands interacting, screens displaying data, processes in motion
-  * Multiple related elements can be shown to convey complexity (e.g., multiple monitors, tools in use)
-- Suggested Composition: Close-up or medium-close shot emphasizing specific details and active investigation""",
+  * Close-up or detail shots that reveal texture, material, and construction
+  * Signs of work in progress: tools set down, parts disassembled, light catching dust or haze
+  * Several related objects can be arranged to convey complexity
+- Suggested Composition: Close-up or medium-close still life emphasizing physical detail""",
             
             "conclusion": """- Narrative Role: Synthesis and forward-looking perspective
-- Subject Focus: Show the OUTCOMES, RESULTS, or FUTURE IMPLICATIONS of the topic
-  * For medical topics: Show successful treatment results, patient outcomes, or next-generation tools
-  * For technology topics: Show completed systems, deployed solutions, or future prototypes
-  * For social topics: Show positive change, solutions in action, or hopeful scenarios
+- Scene Focus: Show the topic's objects or place in a WIDER CONTEXT that suggests outcome and future
+  * For medical topics: the equipment at rest in a bright, calm room; a window opening onto morning light
+  * For technology topics: the finished object in its setting; a horizon, skyline, or open road beyond it
+  * For social topics: the same place at a hopeful hour - dawn light, open doors, a path leading onward
 - Visual Details to Emphasize:
-  * The subject should convey completion or achievement (finished product, successful result)
-  * Include forward-looking elements (next steps, future developments, ongoing monitoring)
-  * Show the subject in a state of resolution or continuity (not abandonment)
-  * Wider framing that shows the subject in context of its impact or future
-- Suggested Composition: Medium or wide shot that shows the subject's place in the larger picture"""
+  * A sense of completion or calm: things put away, light changing, space opening up
+  * Forward-looking elements: an open doorway, a path, a horizon, first light
+  * Wider framing that places the object within its larger environment
+- Suggested Composition: Medium or wide shot that shows the scene's place in the larger picture"""
         }
         return guidance_map.get(segment_type, guidance_map["deep_dive"])
     
@@ -588,14 +620,14 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
         Returns:
             str: Fallback prompt
         """
-        # Map segment type to generic scene (without specific camera angles)
+        # Map segment type to a generic scene with no people and no text-bearing objects
         scene_map = {
-            "intro": "A futuristic radio studio with neon lights and holographic displays",
-            "deep_dive": "A research laboratory with glowing screens and data visualizations",
-            "conclusion": "A cityscape with neon-lit buildings at dusk",
+            "intro": "An empty radio studio with a vintage microphone on a desk stand and dark acoustic panels",
+            "deep_dive": "A quiet workshop bench with precision tools and metal components laid out in neat rows",
+            "conclusion": "A wide city skyline at dusk seen from an empty rooftop under an open sky",
         }
         
-        scene = scene_map.get(segment.segment_type, "A futuristic cityscape")
+        scene = scene_map.get(segment.segment_type, scene_map["deep_dive"])
         
         # Issue #1 fix: No isinstance check needed
         if visual_identity:
@@ -606,7 +638,7 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
             aesthetic_desc = f"{DEFAULT_AESTHETIC} aesthetic"
         
         return (
-            f"{scene}, bathed in {color_desc}, "
+            f"{self.SEGMENT_PROMPT_PREFIX}{scene}, bathed in {color_desc}, "
             f"{aesthetic_desc}, "
-            f"shot on Kodak Portra 400 film, subtle film grain, highly detailed, no text"
+            f"shot on Kodak Portra 400 film, subtle film grain, highly detailed"
         )
