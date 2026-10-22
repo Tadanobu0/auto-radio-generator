@@ -1,8 +1,14 @@
 # STATUS
 
+## 字幕と章タイトルの見た目(ブリーフ 004)— 2026-10-23 時点
+- ブランチ `pm/004` に実装済み。main へは未マージ。実際の見た目は merge・deploy 後の次の /render で radio_director のコマ(frames/)を見て確かめる
+- 字幕: 下に半透明の黒帯(行数に合わせた高さ、上端をぼかす)。めたんの縁はピンク → 暗い赤紫(&H00502080)。文字色(ずんだもん緑 / めたん白)はそのまま
+- 分割: 1 枚 2 行まで。「。」優先、「、」は 1 文が 2 行を超えるときだけ。「、」で分けた残りが 10 字未満にならないよう選ぶ。「…。」と説明…」の括弧の後は文末扱いしない
+- 改行: 行頭に助詞・いう/もの/して/こと を置かない(BudouX の文節を前に繋げる)。「の」の直後の改行は行幅の釣り合いを 15% まで崩して避ける
+- 章タイトル: 「...」で切らない。Meiryo(字幕と同じ)で 2 行まで折り返し、収まらなければ 80→72→64→56px に縮める
+- arg-remote `test -q`: 598 passed / 0 failed / 0 skipped(Python 3.10.6)
+
 ## arg-remote(Windows 実機でのテスト経路)— 2026-10-23 時点
 - `status` → `sync` → `test` → `status` が1周通った(ブリーフ 003)
-- 試験 clone: `E:\windsurf\arg-test\auto_radio_generator`(detached HEAD 5e3d15f、変更・未追跡ファイルなし)
-- `test -q`: 500 passed / 0 failed / 0 skipped(pytest 20.50s、Python 3.10.6)
-- 本番ツリー `E:\windsurf\auto_radio_generator` に残っていた bundle は sync の掃除で消えた。本番ツリーの HEAD は 5e3d15f のまま
+- 試験 clone: `E:\windsurf\arg-test\auto_radio_generator`
 - RadioRemote タスクは Ready(Running ではない)
