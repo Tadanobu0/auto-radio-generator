@@ -16,6 +16,7 @@ from rich.console import Console
 
 from core.models import AppConfig, VideoTimeline
 from core.interfaces import ChapterMarker
+from .topic_overlay import build_topic_overlay_filter
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -242,46 +243,23 @@ class VideoTrackRenderer:
         total_duration_sec: float
     ) -> str:
         """Build topic title overlay filter (center, per segment)
-        
+
+        Titles are never truncated: they wrap to up to 2 lines and shrink if needed
+        (see topic_overlay).
+
         Args:
             chapters: Chapter markers
             total_duration_sec: Total video duration
-        
+
         Returns:
             str: Topic overlay filter string
         """
-        if not chapters:
-            return ""
-        
-        ordered_chapters = sorted(chapters, key=lambda c: c.start_time_sec)
-        fontfile = self._get_drawtext_fontfile()
-        drawtext_filters = []
-        
-        for i, chapter in enumerate(ordered_chapters):
-            start_sec = max(0.0, float(chapter.start_time_sec))
-            
-            if i + 1 < len(ordered_chapters):
-                end_sec = float(ordered_chapters[i + 1].start_time_sec)
-            else:
-                end_sec = float(total_duration_sec)
-            
-            if end_sec <= start_sec:
-                continue
-            
-            # Truncate long titles
-            short_title = self._truncate_topic_title(chapter.title, max_length=20)
-            overlay_text = self._escape_drawtext_text(short_title)
-            
-            drawtext_filters.append(
-                f"drawtext=text='{overlay_text}':"
-                f"fontfile='{fontfile}':"
-                f"fontsize=80:fontcolor=white:"
-                f"x=(w-text_w)/2:y=50:"
-                f"box=1:boxcolor=black@0.5:boxborderw=10:"
-                f"enable='between(t,{start_sec:.3f},{end_sec:.3f})'"
-            )
-        
-        return ",".join(drawtext_filters) if drawtext_filters else ""
+        return build_topic_overlay_filter(
+            chapters,
+            total_duration_sec,
+            self._get_drawtext_fontfile(),
+            self._escape_drawtext_text,
+        )
     
     def _build_subtitle_filter(self, subtitle_path: Path) -> str:
         """Build subtitle overlay filter (.ass file)
@@ -302,9 +280,10 @@ class VideoTrackRenderer:
         Returns:
             str: Escaped font file path
         """
+        # Meiryo first so the chapter title matches the subtitle font
         candidates = [
-            "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/meiryo.ttc",
+            "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/yuGothM.ttc",
             "C:/Windows/Fonts/arial.ttf",
         ]
@@ -340,18 +319,3 @@ class VideoTrackRenderer:
         escaped = escaped.replace("'", "\\'")
         escaped = escaped.replace(",", "\\,")
         return escaped
-    
-    def _truncate_topic_title(self, title: str, max_length: int = 20) -> str:
-        """Truncate topic title for overlay
-        
-        Args:
-            title: Topic title
-            max_length: Maximum length
-        
-        Returns:
-            str: Truncated title
-        """
-        normalized = title.strip()
-        if len(normalized) <= max_length:
-            return normalized
-        return f"{normalized[:max_length]}..."

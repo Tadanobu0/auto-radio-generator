@@ -4,7 +4,7 @@ tests/fixtures/real_scripts/ の verified_script.json (無改変の実物、選�
 README.md) の全ターンを字幕化して、次を確かめる:
 
   1. 全キューの全行が、実フォントの描画幅で安全域 (左右マージン込み) に収まる
-  2. 1 キューは 3 行以内
+  2. 1 キューは MAX_LINES (2) 行以内
   3. [src=N] が字幕に残らない
   4. 文字が欠けない / キューが発話区間をはみ出さない
 
@@ -122,6 +122,60 @@ def test_short_cues_only_remain_when_merge_is_impossible(laid_out):
                     lo, hi = sorted((i, j))
                     merged = cues[lo].text + cues[hi].text
                     assert len(sl.wrap_lines(merged, measure)) > sl.MAX_LINES
+
+
+# ---------------------------------------------------------------------------
+# 分割と改行の規則 (2026-10-23, radio_director-012 のコマ評価)
+# ---------------------------------------------------------------------------
+_SENTENCE_STOP = "。！？!?"
+_PUNCT_END = "、。，．！？!?,.」』）)】"
+
+
+def test_comma_split_only_when_sentence_exceeds_cap(laid_out):
+    # 「、」で終わるキューは、その文が MAX_LINES 行を超えるときだけ
+    # キューの text は行を空白なしで繋いだものなので、空白以外の文字数で表示テキスト上の位置を求める
+    measure = _measure()
+    bad = []
+    for text, _, _, cues in laid_out:
+        display = sl.strip_for_display(text)
+        offsets = [i + 1 for i, ch in enumerate(display) if not ch.isspace()]
+        n = 0
+        for cue in cues[:-1]:  # ターン自体が「、」で終わる (次のターンに続く) ものは分割ではない
+            n += len(re.sub(r"\s+", "", cue.text))
+            if not cue.text.endswith(("、", "，", ",")):
+                continue
+            pos = offsets[n - 1]
+            start = max(display.rfind(ch, 0, pos) for ch in _SENTENCE_STOP) + 1
+            ends = [display.find(ch, pos) for ch in _SENTENCE_STOP]
+            end = min([e for e in ends if e >= 0], default=len(display) - 1) + 1
+            sentence = display[start:end].strip()
+            if "「" not in sentence and len(sl.wrap_lines(sentence, measure)) <= sl.MAX_LINES:
+                bad.append(sentence)
+    assert bad == []
+
+
+def test_short_tail_after_comma_only_when_merge_is_impossible(laid_out):
+    measure = _measure()
+    bad = []
+    for _, _, _, cues in laid_out:
+        for prev, cue in zip(cues, cues[1:]):
+            if prev.text.endswith(("、", "，", ",")) and len(re.sub(r"\s+", "", cue.text)) < sl.MIN_CUE_CHARS:
+                if len(sl.wrap_lines(prev.text + cue.text, measure)) <= sl.MAX_LINES:
+                    bad.append((prev.text, cue.text))
+    assert bad == []
+
+
+def test_no_line_starts_with_particle_or_bound_word(laid_out):
+    bad = []
+    for _, _, _, cues in laid_out:
+        for cue in cues:
+            for prev, line in zip(cue.lines, cue.lines[1:]):
+                if prev[-1:] in _PUNCT_END:
+                    continue
+                # 助詞と同じ字で始まる自立語 (「できる」など) は sl._starts_badly が除く
+                if sl._starts_badly(line):
+                    bad.append((prev, line))
+    assert bad == []
 
 
 # ---------------------------------------------------------------------------

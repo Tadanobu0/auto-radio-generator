@@ -256,20 +256,25 @@ class TestLayoutTurn:
         assert sl.layout_turn(" [src=1] ", 0, 3000, measure) == []
 
     def test_short_cue_is_merged_with_neighbour(self, measure):
-        # 「はい。」単独だと 1.2 秒未満になるので隣と結合される (結合後 3 行までは許す)
-        long_sentence = _grow_until("はい。", "そのあとに続く文は読点なしで長く", "続きますの。", 3, measure)
+        # 「はい。」単独だと 1.2 秒未満になるので隣と結合される (結合後 MAX_LINES 行までは許す)
+        long_sentence = _grow_until(
+            "はい。", "そのあとに続く文は読点なしで長く", "続きますの。", sl.MAX_LINES, measure
+        )
         cues = sl.layout_turn("はい。" + long_sentence, 0, 9000, measure)
         assert len(cues) == 1
-        assert len(cues[0].lines) == 3
+        assert len(cues[0].lines) == sl.MAX_LINES
 
     def test_short_cue_is_kept_when_merge_would_exceed_cap(self, measure):
-        # 隣と結合すると 4 行になるなら、短いまま出す
-        # 空白のない英字の塊は 1 断片なので、3 行をちょうど使い切る長さを作れる
-        n = next(n for n in range(1, 400) if len(sl.wrap_lines("a" * (n + 1) + "。", measure)) > 3)
-        three_lines = "a" * n + "。"
-        assert len(sl.wrap_lines(three_lines, measure)) == 3
-        assert len(sl.wrap_lines("はい。" + three_lines, measure)) > sl.MAX_LINES
-        cues = sl.layout_turn("はい。" + three_lines, 0, 20000, measure)
+        # 隣と結合すると MAX_LINES 行を超えるなら、短いまま出す
+        # 空白のない英字の塊は 1 断片なので、MAX_LINES 行をちょうど使い切る長さを作れる
+        n = next(
+            n for n in range(1, 400)
+            if len(sl.wrap_lines("a" * (n + 1) + "。", measure)) > sl.MAX_LINES
+        )
+        full = "a" * n + "。"
+        assert len(sl.wrap_lines(full, measure)) == sl.MAX_LINES
+        assert len(sl.wrap_lines("はい。" + full, measure)) > sl.MAX_LINES
+        cues = sl.layout_turn("はい。" + full, 0, 20000, measure)
         assert cues[0].text == "はい。"
         assert cues[0].end_ms - cues[0].start_ms < sl.MIN_CUE_MS
         assert all(len(c.lines) <= sl.MAX_LINES for c in cues)

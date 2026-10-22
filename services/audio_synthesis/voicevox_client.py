@@ -17,7 +17,7 @@ from core.interfaces import IAudioSynthesizer, SynthesisResult, ChapterMarker
 from core.models import Script, AppConfig
 from services.media_processing import JingleProvider
 from .voicevox_segment_timing import calculate_segment_timings
-from .subtitle_layout import layout_turn
+from .subtitle_layout import band_drawing, layout_turn
 
 console = Console()
 
@@ -464,7 +464,8 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Main,Meiryo,105,&H0055FF55,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
-Style: Sub,Meiryo,105,&H00FFFFFF,&H000000FF,&H00CC99FF,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
+Style: Sub,Meiryo,105,&H00FFFFFF,&H000000FF,&H00502080,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
+Style: Band,Meiryo,105,&H60000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -482,11 +483,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             
             # 表示層: [src=N] を除去し、実フォントの描画幅で折り返す。安全域と行数上限に
             # 収まらないターンは連続キューに分け、発話区間を文字数比で配る。
+            # 字幕の下には行数に合わせた半透明の帯 (Layer 0) を敷き、字幕は Layer 1 に置く。
             for cue in layout_turn(text, adjusted_start_ms, adjusted_end_ms):
                 start_time = self._ms_to_ass_time(cue.start_ms)
                 end_time = self._ms_to_ass_time(cue.end_ms)
                 wrapped_text = "\\N".join(cue.lines)
-                lines.append(f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{wrapped_text}\n")
+                lines.append(f"Dialogue: 0,{start_time},{end_time},Band,,0,0,0,,{band_drawing(len(cue.lines))}\n")
+                lines.append(f"Dialogue: 1,{start_time},{end_time},{style},,0,0,0,,{wrapped_text}\n")
         
         output_path.write_text("".join(lines), encoding="utf-8")
     
