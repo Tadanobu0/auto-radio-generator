@@ -19,6 +19,7 @@ from core.models import AppConfig, ScriptSegment
 from core.models.visual import VisualIdentity  # Issue #7 fix: Proper type import
 from services.media_processing import ImageProvider, JingleProvider
 from .timeline_calculator import TimelineCalculator
+from .topic_overlay import build_topic_overlay_filter
 from .audio_track_renderer import AudioTrackRenderer
 from .video_track_renderer import VideoTrackRenderer
 from .ffmpeg_renderer_single_image import render_single_image
@@ -84,18 +85,11 @@ class FfmpegRenderer(IVideoRenderer):
         escaped = escaped.replace(",", "\\,")
         return escaped
 
-    def _truncate_topic_title(self, title: str, max_length: int = 20) -> str:
-        """オーバーレイ用にタイトルを最大文字数へ丸める"""
-        normalized = title.strip()
-        if len(normalized) <= max_length:
-            return normalized
-        return f"{normalized[:max_length]}..."
-
     def _get_drawtext_fontfile(self) -> str:
-        """Windowsで利用可能な日本語フォントのfontfile値を返す"""
+        """Windowsで利用可能な日本語フォントのfontfile値を返す(字幕と揃えて Meiryo を優先)"""
         candidates = [
-            "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/meiryo.ttc",
+            "C:/Windows/Fonts/msgothic.ttc",
             "C:/Windows/Fonts/yuGothM.ttc",
             "C:/Windows/Fonts/arial.ttf",
         ]
@@ -109,41 +103,14 @@ class FfmpegRenderer(IVideoRenderer):
         chapters: list[ChapterMarker] | None,
         total_duration_sec: float,
     ) -> str | None:
-        """チャプター単位のトピックオーバーレイ drawtext を構築"""
-        if not chapters:
-            return None
-
-        ordered_chapters = sorted(chapters, key=lambda chapter: chapter.start_time_sec)
-        drawtext_fontfile = self._get_drawtext_fontfile()
-        drawtext_filters: list[str] = []
-
-        for index, chapter in enumerate(ordered_chapters):
-            start_sec = max(0.0, float(chapter.start_time_sec))
-            if index + 1 < len(ordered_chapters):
-                end_sec = float(ordered_chapters[index + 1].start_time_sec)
-            else:
-                end_sec = float(total_duration_sec)
-
-            if end_sec <= start_sec:
-                continue
-
-            short_title = self._truncate_topic_title(chapter.title, max_length=20)
-            overlay_text = self._escape_drawtext_text(short_title)
-            drawtext_filters.append(
-                (
-                    f"drawtext=text='{overlay_text}':"
-                    f"fontfile='{drawtext_fontfile}':"
-                    f"fontsize=80:fontcolor=white:"
-                    f"x=(w-text_w)/2:y=50:"
-                    f"box=1:boxcolor=black@0.5:boxborderw=10:"
-                    f"enable='between(t,{start_sec:.3f},{end_sec:.3f})'"
-                )
-            )
-
-        if not drawtext_filters:
-            return None
-
-        return ",".join(drawtext_filters)
+        """チャプター単位のトピックオーバーレイ drawtext を構築(タイトルは切らずに折り返す)"""
+        overlay = build_topic_overlay_filter(
+            chapters,
+            total_duration_sec,
+            self._get_drawtext_fontfile(),
+            self._escape_drawtext_text,
+        )
+        return overlay or None
     
     def check_ffmpeg_available(self) -> bool:
         """FFmpegが利用可能か確認"""

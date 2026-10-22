@@ -5,8 +5,13 @@ verified_script.json と phrase_data (1ターン=1要素) は変更しない。�
 
 不変条件:
   - 全行の描画幅が MAX_TEXT_WIDTH_PX 以下 (文字数ではなく実フォントの幅で判定)
-  - 1キューは原則 PREFERRED_LINES 行、上限 MAX_LINES 行
+  - 1キューは MAX_LINES (2) 行まで
   - 分割したキューの表示時間は、発話区間の中で文字数比で配る
+
+分割と改行の規則 (2026-10-23, CO2 回のコマ評価 radio_director-012 を受けて):
+  - キューはなるべく文末 (。！？) で分ける。読点で分けるのは 1 文が 2 行を超えるときだけ
+  - 読点で分けた残りが短い (MIN_CUE_CHARS 字未満) キューは作らない (前後と繋げる)
+  - 行頭に助詞・「いう」「もの」「して」「こと」を置かない。「の」の直後での改行は後回し
 """
 from __future__ import annotations
 
@@ -22,10 +27,12 @@ logger = logging.getLogger(__name__)
 
 # --- ASS スタイルと同じ値 (voicevox_client._generate_ass のヘッダーと揃える) ---
 PLAY_RES_X = 1920
+PLAY_RES_Y = 1080
 FONT_NAME = "Meiryo"
 FONT_SIZE = 105
 MARGIN_L = 80
 MARGIN_R = 80
+MARGIN_V = 30
 OUTLINE = 6
 SHADOW = 2
 
@@ -34,9 +41,14 @@ SAFE_WIDTH_PX = PLAY_RES_X - MARGIN_L - MARGIN_R
 MAX_TEXT_WIDTH_PX = SAFE_WIDTH_PX - 2 * (OUTLINE + SHADOW)
 
 PREFERRED_LINES = 2
-MAX_LINES = 3
+MAX_LINES = 2
 # これより短いキューは隣と結合する (結合して MAX_LINES を超えるなら短いまま出す)
 MIN_CUE_MS = 1200
+# 読点で分けたとき、これより短い (空白を除く文字数) キューはなるべく作らない
+MIN_CUE_CHARS = 10
+
+# 字幕の下に敷く半透明の帯 (文字の上端からの余白)
+BAND_PAD_PX = 24
 
 FONT_CANDIDATES = (
     Path("C:/Windows/Fonts/meiryo.ttc"),
@@ -47,10 +59,24 @@ Measure = Callable[[str], float]
 _CITATION_TAG = re.compile(r"\[src=\d+(?:\s*,\s*\d+)*\]")
 _SPACE_BEFORE_PUNCT = re.compile(r"[ \t\u3000]+(?=[、。，．！？!?,.])")
 _MULTI_SPACE = re.compile(r"[ \t]{2,}")
-_SENTENCE = re.compile(r"[^。！？!?]*[。！？!?]+[」』）)】\]]*|[^。！？!?]+$")
-_CLAUSE = re.compile(r"[^、，,]*[、，,]+|[^、，,]+$")
+# 句読点で終わる節 (閉じ括弧は節に含める)。最後の節は句読点で終わらなくてよい
+_UNIT = re.compile(r"[^、，,。！？!?]*[、，,。！？!?]+[」』）)】\]]*|[^、，,。！？!?]+$")
+_SENTENCE_END = re.compile(r"[。！？!?][」』）)】\]]*$")
+_OPEN_BRACKETS = "「『（(【"
+_CLOSE_BRACKETS = "」』）)】"
 # 行頭に置かない文字 (文字単位で割るときだけ使う。BudouX の文節境界では起きない)
 _NO_LINE_START = "、。，．！？!?,.」』）)】]ー〜…ゃゅょっャュョッ"
+_PUNCTUATION = "、。，．！？!?,.「『（(【」』）)】[]…"
+# 文節の頭に来たら前の文節に繋げる語 (BudouX が「CO2その/ものは」のように切ることがある)
+_NO_PHRASE_START_WORDS = ("いう", "もの", "して", "こと")
+_NO_PHRASE_START_PARTICLES = "はがをにでともへやのか"
+# 「の」の直後での改行を避けるとき、行幅の釣り合いをどこまで崩してよいか (max_width 比)
+_WEAK_BREAK_SLACK = 0.15
+
+# キューの切れ目の種類 (小さいほど切りやすい)
+_BREAK_SENTENCE = 0
+_BREAK_COMMA = 1
+_BREAK_PHRASE = 2
 
 
 # ---------------------------------------------------------------------------
@@ -161,13 +187,39 @@ def _budoux_parser():
     return load_default_japanese_parser()
 
 
+def _starts_badly(chunk: str) -> bool:
+    """行頭に置きたくない語 (助詞・「いう」「もの」「して」「こと」) で始まるか。"""
+    return chunk.startswith(_NO_PHRASE_START_WORDS) or chunk[:1] in _NO_PHRASE_START_PARTICLES
+
+
+def _phrases(text: str, measure: Measure, max_width: float) -> list[str]:
+    """BudouX の文節に分け、行頭に置きたくない語で始まる文節を前の文節に繋げる。
+
+    前の文節が句読点・空白で終わるときは繋げない (そこは文の切れ目)。繋げた文節が
+    max_width の 3/4 を超えるなら繋げない (改行できる位置が無くなるのを防ぐ)。
+    """
+    merged: list[str] = []
+    for chunk in _budoux_parser().parse(text):
+        if (
+            merged
+            and _starts_badly(chunk)
+            and not merged[-1][-1:].isspace()
+            and merged[-1][-1:] not in _PUNCTUATION
+            and measure((merged[-1] + chunk).strip()) <= max_width * 0.75
+        ):
+            merged[-1] += chunk
+        else:
+            merged.append(chunk)
+    return merged
+
+
 def _break_pieces(text: str, measure: Measure, max_width: float) -> list[str]:
     """改行してよい位置で区切った断片の列を返す (連結すると text に戻る)。
 
-    文節 (BudouX) → 空白の直後 → それでも幅を超える断片は文字単位。
+    文節 (BudouX + 行頭禁止語の結合) → 空白の直後 → それでも幅を超える断片は文字単位。
     """
     pieces: list[str] = []
-    for chunk in _budoux_parser().parse(text):
+    for chunk in _phrases(text, measure, max_width):
         for part in re.findall(r"\S*\s*", chunk):
             if not part:
                 continue
@@ -201,6 +253,8 @@ def _balanced_lines(pieces: Sequence[str], n_lines: int, measure: Measure, max_w
     """n_lines 行のまま、行の長さがなるべく揃う切り方を返す (末尾に1〜2文字だけ残るのを避ける)。
 
     英単語の間 (空白) での改行は、文節の切れ目での改行より後回しにする。
+    「の」の直後での改行 (「頭の/テスト」) は、行幅の釣り合いを _WEAK_BREAK_SLACK まで
+    崩してよい範囲で避ける。
     """
     count = len(pieces)
     # 断片 i の直後で改行すると英単語の間で切ることになるか
@@ -208,37 +262,50 @@ def _balanced_lines(pieces: Sequence[str], n_lines: int, measure: Measure, max_w
         p[-1:].isspace() and p.strip()[-1:].isascii() and pieces[i + 1][:1].isascii()
         for i, p in enumerate(pieces[:-1])
     ]
+    # 断片 i の直後で改行すると「の」の直後で切ることになるか
+    weak = [p.endswith("の") for p in pieces[:-1]]
 
     def width(i: int, j: int) -> float:
         return measure("".join(pieces[i:j]).strip())
 
-    inf = (float("inf"), float("inf"))
-    # best[k][j]: 先頭 j 断片を k 行に収めたときの (英単語間の改行数, 最大行幅) の最小値
-    best = [[inf] * (count + 1) for _ in range(n_lines + 1)]
-    back = [[0] * (count + 1) for _ in range(n_lines + 1)]
-    best[0][0] = (0, 0.0)
-    for k in range(1, n_lines + 1):
-        for j in range(k, count + 1):
-            for i in range(k - 1, j):
-                if best[k - 1][i] == inf:
-                    continue
-                w = width(i, j)
-                if w > max_width:
-                    continue
-                gaps = best[k - 1][i][0] + (1 if 0 < i and word_gap[i - 1] else 0)
-                cost = (gaps, max(best[k - 1][i][1], w))
-                if cost < best[k][j]:
-                    best[k][j] = cost
-                    back[k][j] = i
-    if best[n_lines][count] == inf:
+    def solve(limit: float, avoid_weak: bool) -> Optional[tuple[float, list[str]]]:
+        inf = (float("inf"), float("inf"), float("inf"))
+        # best[k][j]: 先頭 j 断片を k 行に収めたときの (英単語間の改行数, 「の」の後の改行数, 最大行幅) の最小値
+        best = [[inf] * (count + 1) for _ in range(n_lines + 1)]
+        back = [[0] * (count + 1) for _ in range(n_lines + 1)]
+        best[0][0] = (0, 0, 0.0)
+        for k in range(1, n_lines + 1):
+            for j in range(k, count + 1):
+                for i in range(k - 1, j):
+                    if best[k - 1][i] == inf:
+                        continue
+                    w = width(i, j)
+                    if w > limit:
+                        continue
+                    gaps = best[k - 1][i][0] + (1 if 0 < i and word_gap[i - 1] else 0)
+                    weaks = best[k - 1][i][1] + (1 if avoid_weak and 0 < i and weak[i - 1] else 0)
+                    cost = (gaps, weaks, max(best[k - 1][i][2], w))
+                    if cost < best[k][j]:
+                        best[k][j] = cost
+                        back[k][j] = i
+        if best[n_lines][count] == inf:
+            return None
+        lines: list[str] = []
+        j = count
+        for k in range(n_lines, 0, -1):
+            i = back[k][j]
+            lines.append("".join(pieces[i:j]).strip())
+            j = i
+        lines.reverse()
+        return best[n_lines][count][2], lines
+
+    plain = solve(max_width, avoid_weak=False)
+    if plain is None:
         return None
-    lines: list[str] = []
-    j = count
-    for k in range(n_lines, 0, -1):
-        i = back[k][j]
-        lines.append("".join(pieces[i:j]).strip())
-        j = i
-    lines.reverse()
+    widest, lines = plain
+    preferred = solve(min(max_width, widest + _WEAK_BREAK_SLACK * max_width), avoid_weak=True)
+    if preferred is not None:
+        lines = preferred[1]
     return lines if all(lines) else None
 
 
@@ -265,69 +332,100 @@ def _line_count(text: str, measure: Measure, max_width: float) -> int:
 # ---------------------------------------------------------------------------
 # キュー分割
 # ---------------------------------------------------------------------------
-def _spans(text: str, pattern: re.Pattern, offset: int = 0) -> list[tuple[int, int]]:
-    return [
-        (offset + m.start(), offset + m.end())
-        for m in pattern.finditer(text)
-        if m.group(0).strip()
-    ]
+def _break_units(text: str, measure: Measure, max_width: float) -> list[tuple[int, int, int]]:
+    """キューの切れ目になりうる位置で text を区切り、(開始, 終了, 直後の切れ目の種類) の列を返す。
+
+    句読点で終わる節が単位。括弧の外の文末は _BREAK_SENTENCE、読点と括弧の中の文末は
+    _BREAK_COMMA。1 節だけで MAX_LINES 行を超える節は、さらに文節で区切る (_BREAK_PHRASE)。
+    """
+    units: list[tuple[int, int, int]] = []
+    depth = 0
+    pos = 0
+    for m in _UNIT.finditer(text):
+        start, end = m.start(), m.end()
+        if not m.group(0).strip():
+            continue
+        for ch in text[pos:end]:
+            if ch in _OPEN_BRACKETS:
+                depth += 1
+            elif ch in _CLOSE_BRACKETS:
+                depth = max(0, depth - 1)
+        pos = end
+        is_last = not text[end:].strip()
+        kind = _BREAK_SENTENCE if is_last or (depth == 0 and _SENTENCE_END.search(m.group(0))) else _BREAK_COMMA
+        if _line_count(text[start:end], measure, max_width) <= MAX_LINES:
+            units.append((start, end, kind))
+            continue
+        piece_start = start
+        pieces = _break_pieces(text[start:end], measure, max_width)
+        for n, piece in enumerate(pieces):
+            piece_end = piece_start + len(piece)
+            units.append((piece_start, piece_end, kind if n == len(pieces) - 1 else _BREAK_PHRASE))
+            piece_start = piece_end
+    # 「…ですの。」と説明していますの。 のように、閉じ括弧の後が助詞で続くなら文末ではない
+    for k in range(len(units) - 1):
+        start, end, kind = units[k]
+        if (
+            kind == _BREAK_SENTENCE
+            and text[end - 1] in _CLOSE_BRACKETS
+            and _starts_badly(text[end:units[k + 1][1]].lstrip())
+        ):
+            units[k] = (start, end, _BREAK_COMMA)
+    return units
 
 
 def split_cues(text: str, measure: Optional[Measure] = None, max_width: float = MAX_TEXT_WIDTH_PX) -> list[str]:
-    """表示用テキストを、MAX_LINES 行以内のキュー列に分ける。
+    """表示用テキストを、MAX_LINES 行以内のキュー列に分ける。フォントは縮小しない。
 
-    文末で区切り、PREFERRED_LINES 行に収まる範囲で隣の文とまとめる。1文が MAX_LINES 行を
-    超えるときだけ読点で、それでも超えるなら行の切れ目で分ける。フォントは縮小しない。
+    切れ目の候補 (_break_units) をまとめてキューにする。どのキューも MAX_LINES 行以内という
+    条件のもとで、次の順に少ない分け方を選ぶ:
+      1. 文節での切れ目 (読点も無いほど長い節のときだけ使う)
+      2. 読点での切れ目 (1 文が MAX_LINES 行を超えるときだけ使う)
+      3. MIN_CUE_CHARS 字未満の短いキュー (読点で分けた残りを前後に繋げる)
+      4. キューの数
+      5. キューの長さのばらつき (文字数の二乗和)
     """
     measure = measure or default_measurer()
     text = text.strip()
     if not text:
         return []
 
-    def lines_of(start: int, end: int) -> int:
-        return _line_count(text[start:end], measure, max_width)
-
-    def pack(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
-        packed: list[tuple[int, int]] = []
-        for start, end in spans:
-            if packed and lines_of(packed[-1][0], end) <= PREFERRED_LINES:
-                packed[-1] = (packed[-1][0], end)
-            else:
-                packed.append((start, end))
-        return packed
-
-    atoms: list[tuple[int, int]] = []
-    for s_start, s_end in _spans(text, _SENTENCE):
-        if lines_of(s_start, s_end) <= MAX_LINES:
-            atoms.append((s_start, s_end))
-            continue
-        parts: list[tuple[int, int]] = []
-        for c_start, c_end in _spans(text[s_start:s_end], _CLAUSE, s_start):
-            if lines_of(c_start, c_end) <= MAX_LINES:
-                parts.append((c_start, c_end))
+    units = _break_units(text, measure, max_width)
+    count = len(units)
+    inf = (float("inf"),) * 5
+    # best[j]: 先頭 j 単位をキューに分けたときの (文節の切れ目, 読点の切れ目, 短いキュー, キュー数, 二乗和)
+    best = [inf] * (count + 1)
+    back = [0] * (count + 1)
+    best[0] = (0, 0, 0, 0, 0)
+    for j in range(1, count + 1):
+        for i in range(j - 1, -1, -1):
+            cue = text[units[i][0]:units[j - 1][1]]
+            if j - i > 1 and _line_count(cue, measure, max_width) > MAX_LINES:
+                break
+            if best[i] == inf:
                 continue
-            # 読点でも割れない長さ: 行の切れ目で PREFERRED_LINES 行ずつに分ける
-            pieces = _break_pieces(text[c_start:c_end], measure, max_width)
-            pos = c_start
-            group_start = c_start
-            current = ""
-            n_in_group = 1
-            for piece in pieces:
-                if current.strip() and measure((current + piece).strip()) > max_width:
-                    if n_in_group == PREFERRED_LINES:
-                        parts.append((group_start, pos))
-                        group_start = pos
-                        n_in_group = 1
-                    else:
-                        n_in_group += 1
-                    current = piece
-                else:
-                    current += piece
-                pos += len(piece)
-            parts.append((group_start, c_end))
-        atoms.extend(pack(parts))
+            kind = units[i - 1][2] if i > 0 else _BREAK_SENTENCE
+            chars = _weight(cue)
+            prev = best[i]
+            cost = (
+                prev[0] + (kind == _BREAK_PHRASE),
+                prev[1] + (kind == _BREAK_COMMA),
+                prev[2] + (chars < MIN_CUE_CHARS),
+                prev[3] + 1,
+                prev[4] + chars * chars,
+            )
+            if cost < best[j]:
+                best[j] = cost
+                back[j] = i
 
-    return [text[start:end].strip() for start, end in pack(atoms) if text[start:end].strip()]
+    spans: list[tuple[int, int]] = []
+    j = count
+    while j > 0:
+        i = back[j]
+        spans.append((units[i][0], units[j - 1][1]))
+        j = i
+    spans.reverse()
+    return [text[start:end].strip() for start, end in spans if text[start:end].strip()]
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +491,30 @@ def _join(left: str, right: str) -> str:
     if left[-1:].isascii() and right[:1].isascii():
         return f"{left} {right}"
     return left + right
+
+
+# ---------------------------------------------------------------------------
+# 字幕の下の帯
+# ---------------------------------------------------------------------------
+def band_top_y(n_lines: int) -> int:
+    """n_lines 行の字幕の下に敷く帯の上端 (PlayResY 座標)。
+
+    libass は Fontsize を 1 行の高さ (アセンダ+ディセンダ) として扱うので、
+    字幕の上端は 下端 (PLAY_RES_Y - MARGIN_V) から n_lines * FONT_SIZE 上。
+    """
+    return PLAY_RES_Y - MARGIN_V - n_lines * FONT_SIZE - BAND_PAD_PX
+
+
+def band_drawing(n_lines: int) -> str:
+    """帯の ASS 本文 (ベクター描画)。上端だけをぼかすため、左右と下は画面外まで伸ばす。"""
+    bleed = 40
+    top = band_top_y(n_lines)
+    width = PLAY_RES_X + 2 * bleed
+    height = PLAY_RES_Y - top + bleed
+    return (
+        f"{{\\an7\\pos({-bleed},{top})\\blur12\\p1}}"
+        f"m 0 0 l {width} 0 {width} {height} 0 {height}{{\\p0}}"
+    )
 
 
 # ---------------------------------------------------------------------------
