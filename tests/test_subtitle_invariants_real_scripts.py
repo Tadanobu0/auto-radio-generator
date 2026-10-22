@@ -133,21 +133,22 @@ _PUNCT_END = "、。，．！？!?,.」』）)】"
 
 def test_comma_split_only_when_sentence_exceeds_cap(laid_out):
     # 「、」で終わるキューは、その文が MAX_LINES 行を超えるときだけ
-    # 位置は空白を除いた文字列で数える (キューの text は行を空白なしで繋いだもの)
+    # キューの text は行を空白なしで繋いだものなので、空白以外の文字数で表示テキスト上の位置を求める
     measure = _measure()
-    squash = lambda s: re.sub(r"\s+", "", s)
     bad = []
     for text, _, _, cues in laid_out:
-        display = squash(sl.strip_for_display(text))
-        pos = 0
+        display = sl.strip_for_display(text)
+        offsets = [i + 1 for i, ch in enumerate(display) if not ch.isspace()]
+        n = 0
         for cue in cues:
-            pos += len(squash(cue.text))
+            n += len(re.sub(r"\s+", "", cue.text))
             if not cue.text.endswith(("、", "，", ",")):
                 continue
+            pos = offsets[n - 1]
             start = max(display.rfind(ch, 0, pos) for ch in _SENTENCE_STOP) + 1
             ends = [display.find(ch, pos) for ch in _SENTENCE_STOP]
             end = min([e for e in ends if e >= 0], default=len(display) - 1) + 1
-            sentence = display[start:end]
+            sentence = display[start:end].strip()
             if "「" not in sentence and len(sl.wrap_lines(sentence, measure)) <= sl.MAX_LINES:
                 bad.append(sentence)
     assert bad == []
@@ -171,7 +172,8 @@ def test_no_line_starts_with_particle_or_bound_word(laid_out):
             for prev, line in zip(cue.lines, cue.lines[1:]):
                 if prev[-1:] in _PUNCT_END:
                     continue
-                if line.startswith(("いう", "もの", "して", "こと")) or line[:1] in "はがをにでともへやのか":
+                # 助詞と同じ字で始まる自立語 (「できる」など) は sl._starts_badly が除く
+                if sl._starts_badly(line):
                     bad.append((prev, line))
     assert bad == []
 

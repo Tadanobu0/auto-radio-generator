@@ -70,6 +70,12 @@ _PUNCTUATION = "、。，．！？!?,.「『（(【」』）)】[]…"
 # 文節の頭に来たら前の文節に繋げる語 (BudouX が「CO2その/ものは」のように切ることがある)
 _NO_PHRASE_START_WORDS = ("いう", "もの", "して", "こと")
 _NO_PHRASE_START_PARTICLES = "はがをにでともへやのか"
+# 助詞と同じ字で始まるが、行頭に来てよい語
+_PARTICLE_LIKE_WORDS = (
+    "でき", "とき", "ところ", "とても", "とにかく", "とりあえず", "ともに",
+    "もっと", "もう", "もし", "もちろん", "もと", "やはり", "やっぱり", "やっと",
+    "かなり", "かつて", "かえって", "はじめ", "はっきり", "がんば", "のんびり",
+)
 # 「の」の直後での改行を避けるとき、行幅の釣り合いをどこまで崩してよいか (max_width 比)
 _WEAK_BREAK_SLACK = 0.15
 
@@ -188,50 +194,56 @@ def _budoux_parser():
 
 
 def _starts_badly(chunk: str) -> bool:
-    """行頭に置きたくない語 (助詞・「いう」「もの」「して」「こと」) で始まるか。"""
+    """行頭に置きたくない語 (助詞・「いう」「もの」「して」「こと」) で始まるか。
+
+    助詞と同じ字で始まる自立語 (「できる」「もっと」「とても」など) は除く。
+    """
+    if chunk.startswith(_PARTICLE_LIKE_WORDS):
+        return False
     return chunk.startswith(_NO_PHRASE_START_WORDS) or chunk[:1] in _NO_PHRASE_START_PARTICLES
 
 
 def _phrases(text: str, measure: Measure, max_width: float) -> list[str]:
-    """BudouX の文節に分け、行頭に置きたくない語で始まる文節を前の文節に繋げる。
+    """文節 (BudouX) と空白で区切り、行頭に置きたくない語で始まる断片を前の断片に繋げる。
 
-    前の文節が句読点・空白で終わるときは繋げない (そこは文の切れ目)。繋げた文節が
+    「iPhone と友人の」の「と」のように、英単語の後の空白をはさんでも繋げる。
+    前の断片が句読点で終わるときは繋げない (そこは文の切れ目)。繋げた断片が
     max_width の 3/4 を超えるなら繋げない (改行できる位置が無くなるのを防ぐ)。
     """
     merged: list[str] = []
     for chunk in _budoux_parser().parse(text):
-        if (
-            merged
-            and _starts_badly(chunk)
-            and not merged[-1][-1:].isspace()
-            and merged[-1][-1:] not in _PUNCTUATION
-            and measure((merged[-1] + chunk).strip()) <= max_width * 0.75
-        ):
-            merged[-1] += chunk
-        else:
-            merged.append(chunk)
+        for part in re.findall(r"\S*\s*", chunk):
+            if not part:
+                continue
+            if (
+                merged
+                and merged[-1].strip()
+                and _starts_badly(part)
+                and merged[-1].rstrip()[-1:] not in _PUNCTUATION
+                and measure((merged[-1] + part).strip()) <= max_width * 0.75
+            ):
+                merged[-1] += part
+            else:
+                merged.append(part)
     return merged
 
 
 def _break_pieces(text: str, measure: Measure, max_width: float) -> list[str]:
     """改行してよい位置で区切った断片の列を返す (連結すると text に戻る)。
 
-    文節 (BudouX + 行頭禁止語の結合) → 空白の直後 → それでも幅を超える断片は文字単位。
+    文節 (BudouX) と空白の直後 (行頭禁止語の前は除く) → それでも幅を超える断片は文字単位。
     """
     pieces: list[str] = []
-    for chunk in _phrases(text, measure, max_width):
-        for part in re.findall(r"\S*\s*", chunk):
-            if not part:
-                continue
-            while measure(part.strip()) > max_width:
-                cut = len(part) - 1
-                while cut > 1 and measure(part[:cut].strip()) > max_width:
-                    cut -= 1
-                while cut > 1 and part[cut] in _NO_LINE_START:
-                    cut -= 1
-                pieces.append(part[:cut])
-                part = part[cut:]
-            pieces.append(part)
+    for part in _phrases(text, measure, max_width):
+        while measure(part.strip()) > max_width:
+            cut = len(part) - 1
+            while cut > 1 and measure(part[:cut].strip()) > max_width:
+                cut -= 1
+            while cut > 1 and part[cut] in _NO_LINE_START:
+                cut -= 1
+            pieces.append(part[:cut])
+            part = part[cut:]
+        pieces.append(part)
     return pieces
 
 
