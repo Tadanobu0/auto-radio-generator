@@ -140,7 +140,7 @@ def test_comma_split_only_when_sentence_exceeds_cap(laid_out):
         display = sl.strip_for_display(text)
         offsets = [i + 1 for i, ch in enumerate(display) if not ch.isspace()]
         n = 0
-        for cue in cues:
+        for cue in cues[:-1]:  # ターン自体が「、」で終わる (次のターンに続く) ものは分割ではない
             n += len(re.sub(r"\s+", "", cue.text))
             if not cue.text.endswith(("、", "，", ",")):
                 continue
