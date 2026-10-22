@@ -125,6 +125,58 @@ def test_short_cues_only_remain_when_merge_is_impossible(laid_out):
 
 
 # ---------------------------------------------------------------------------
+# 分割と改行の規則 (2026-10-23, radio_director-012 のコマ評価)
+# ---------------------------------------------------------------------------
+_SENTENCE_STOP = "。！？!?"
+_PUNCT_END = "、。，．！？!?,.」』）)】"
+
+
+def test_comma_split_only_when_sentence_exceeds_cap(laid_out):
+    # 「、」で終わるキューは、その文が MAX_LINES 行を超えるときだけ
+    # 位置は空白を除いた文字列で数える (キューの text は行を空白なしで繋いだもの)
+    measure = _measure()
+    squash = lambda s: re.sub(r"\s+", "", s)
+    bad = []
+    for text, _, _, cues in laid_out:
+        display = squash(sl.strip_for_display(text))
+        pos = 0
+        for cue in cues:
+            pos += len(squash(cue.text))
+            if not cue.text.endswith(("、", "，", ",")):
+                continue
+            start = max(display.rfind(ch, 0, pos) for ch in _SENTENCE_STOP) + 1
+            ends = [display.find(ch, pos) for ch in _SENTENCE_STOP]
+            end = min([e for e in ends if e >= 0], default=len(display) - 1) + 1
+            sentence = display[start:end]
+            if "「" not in sentence and len(sl.wrap_lines(sentence, measure)) <= sl.MAX_LINES:
+                bad.append(sentence)
+    assert bad == []
+
+
+def test_short_tail_after_comma_only_when_merge_is_impossible(laid_out):
+    measure = _measure()
+    bad = []
+    for _, _, _, cues in laid_out:
+        for prev, cue in zip(cues, cues[1:]):
+            if prev.text.endswith(("、", "，", ",")) and len(re.sub(r"\s+", "", cue.text)) < sl.MIN_CUE_CHARS:
+                if len(sl.wrap_lines(prev.text + cue.text, measure)) <= sl.MAX_LINES:
+                    bad.append((prev.text, cue.text))
+    assert bad == []
+
+
+def test_no_line_starts_with_particle_or_bound_word(laid_out):
+    bad = []
+    for _, _, _, cues in laid_out:
+        for cue in cues:
+            for prev, line in zip(cue.lines, cue.lines[1:]):
+                if prev[-1:] in _PUNCT_END:
+                    continue
+                if line.startswith(("いう", "もの", "して", "こと")) or line[:1] in "はがをにでともへやのか":
+                    bad.append((prev, line))
+    assert bad == []
+
+
+# ---------------------------------------------------------------------------
 # Hermes Agent 回 (run 20261007_190721) で実際に崩れていたキューの回帰
 #   #2  : 5 行 + [src=4] [src=23] が表示
 #   #70 : 7 行、2 行目が左右で欠け、[src=28] が 2 回表示
