@@ -334,10 +334,12 @@ Generate the prompt now:"""
         """Pick dialogue excerpts spread over the segment, within MAX_CONTEXT_CHARS.
 
         - Whole dialogue fits the budget: return it all.
-        - Otherwise take the turns around (one before, the turn, one after) each anchor turn:
-          the first turn citing each key claim's source ([src=N]), or, when there are no
-          such turns, evenly spaced turns. The budget is split equally between the excerpts,
-          which are joined by newlines.
+        - Otherwise quote each anchor turn - the first turn citing each key claim's source
+          ([src=N]), or, when there are no such turns, evenly spaced turns - with the turn
+          before and after it when they fit. The budget is split equally between the anchors
+          (key claims often cluster early in a segment, so a shared window would spend the
+          whole budget on the opening again). The anchor turn itself has priority; neighbours
+          are added only whole and never repeat a turn. Excerpts are joined by newlines.
         """
         turns = segment.turns or []
         texts = [self._CITATION_TAG.sub("", turn.get("text") or "").strip() for turn in turns]
@@ -349,22 +351,26 @@ Generate the prompt now:"""
         if not anchors:
             anchors = self._even_anchor_turns(len(turns))
 
-        # Merge overlapping / adjacent windows so no turn is quoted twice
-        windows: List[List[int]] = []
-        for anchor in anchors:
-            start, end = max(anchor - 1, 0), min(anchor + 1, len(turns) - 1)
-            if windows and start <= windows[-1][1] + 1:
-                windows[-1][1] = max(windows[-1][1], end)
-            else:
-                windows.append([start, end])
-
-        separators = len(windows) - 1
-        budget = (self.MAX_CONTEXT_CHARS - separators) // len(windows)
+        separators = len(anchors) - 1
+        budget = (self.MAX_CONTEXT_CHARS - separators) // len(anchors)
+        used = set(anchors)
         excerpts = []
-        for start, end in windows:
-            excerpt = " ".join(text for text in texts[start:end + 1] if text)
-            if excerpt:
-                excerpts.append(self._truncate_excerpt(excerpt, budget))
+        for anchor in anchors:
+            parts = [texts[anchor]] if texts[anchor] else []
+            remaining = budget - len(texts[anchor])
+            for neighbour in (anchor - 1, anchor + 1):
+                if not 0 <= neighbour < len(turns) or neighbour in used or not texts[neighbour]:
+                    continue
+                if len(texts[neighbour]) + 1 > remaining:
+                    continue
+                if neighbour < anchor:
+                    parts.insert(0, texts[neighbour])
+                else:
+                    parts.append(texts[neighbour])
+                used.add(neighbour)
+                remaining -= len(texts[neighbour]) + 1
+            if parts:
+                excerpts.append(self._truncate_excerpt(" ".join(parts), budget))
         return "\n".join(excerpts)
 
     def _key_claim_anchor_turns(self, turns: List[dict], source_idxs: List[int]) -> List[int]:

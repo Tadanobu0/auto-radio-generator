@@ -261,12 +261,30 @@ class TestSegmentExcerpts:
         gen, _ = _make_generator(mock_factory_create)
         segment = _long_segment()
         segment.turns[11]["text"] += "[src=5]"
-        segment.key_claim_source_idxs = [7, 5]  # ターン 10 と 11: 窓 9-11 と 10-12 は 1 つにまとまる
+        segment.key_claim_source_idxs = [7, 5]  # 隣り合う論点ターン 10 と 11
         excerpt = gen._select_dialogue_excerpts(segment)
 
-        assert "\n" not in excerpt
-        assert excerpt.count("ターン10") == 1
-        assert "ターン12" in excerpt
+        assert excerpt.split("\n")[0].startswith("ターン09")
+        assert excerpt.split("\n")[1].startswith("ターン11")
+        for i in (9, 10, 11, 12):
+            assert excerpt.count(f"ターン{i:02d}") == 1
+
+    @patch(FACTORY_PATH)
+    def test_clustered_key_claims_each_keep_their_turn(self, mock_factory_create):
+        """論点が章の前半に固まっていても、各論点のターンが抜粋から落ちない。"""
+        from services.script_generation.image_prompt_generator import ImagePromptGenerator
+
+        gen, _ = _make_generator(mock_factory_create)
+        segment = _long_segment()
+        for i, src in zip(range(1, 8), range(101, 108)):
+            segment.turns[i]["text"] += f"[src={src}]"
+        segment.turns[36]["text"] = "ターン36で最後の論点の話をします。[src=200]"
+        segment.key_claim_source_idxs = list(range(101, 108)) + [200]
+        excerpt = gen._select_dialogue_excerpts(segment)
+
+        assert len(excerpt) <= ImagePromptGenerator.MAX_CONTEXT_CHARS
+        for i in list(range(1, 8)) + [36]:
+            assert f"ターン{i:02d}" in excerpt, f"key-claim turn {i} missing from excerpt"
 
     @patch(FACTORY_PATH)
     def test_long_excerpt_is_cut_within_budget(self, mock_factory_create):
