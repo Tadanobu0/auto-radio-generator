@@ -8,6 +8,7 @@ Renders silent video track with:
 """
 import asyncio
 import logging
+import math
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +21,38 @@ from .topic_overlay import build_topic_overlay_filter
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+
+def _even(value: float) -> int:
+    """Round up to an even pixel count (yuv420p needs even sizes)."""
+    n = math.ceil(value)
+    return n + (n % 2)
+
+
+def build_pan_filter(width: int, height: int, duration_sec: float, pan_ratio: float, scene_index: int) -> str:
+    """Filter chain that slowly pans one still image across the frame (no zoom).
+
+    The image is scaled to (1 + pan_ratio) of the frame (cropped to that exact size
+    from the centre if its aspect differs), then a frame-sized crop window moves
+    horizontally by the slack (pan_ratio of the width) over the scene, using the
+    input time t. Scenes alternate left-to-right and right-to-left; the window stays
+    vertically centred. Zero-length scenes get a fixed centred window.
+    """
+    big_w = _even(width * (1 + pan_ratio))
+    big_h = _even(height * (1 + pan_ratio))
+    dx = big_w - width
+    dy = big_h - height
+    if duration_sec > 0:
+        progress = f"t/{duration_sec:.3f}"
+        x = f"{dx}*{progress}" if scene_index % 2 == 0 else f"{dx}-{dx}*{progress}"
+    else:
+        x = str(dx // 2)
+    return (
+        f"scale={big_w}:{big_h}:force_original_aspect_ratio=increase,"
+        f"crop={big_w}:{big_h},"
+        f"crop={width}:{height}:x={x}:y={dy // 2},"
+        f"setsar=1"
+    )
 
 
 class VideoTrackRenderer:
@@ -75,7 +108,10 @@ class VideoTrackRenderer:
         cmd = self._build_ffmpeg_command(timeline, output_path, chapters)
         
         # Debug output
-        console.print(f"[dim]Video track: {len(timeline.segments)} segments with background switching[/dim]")
+        console.print(
+            f"[dim]Video track: {len(timeline.segments)} segments, "
+            f"{len(timeline.video_scenes())} backgrounds (pan: {self._pan_ratio():.0%})[/dim]"
+        )
         
         # Execute FFmpeg
         process = await asyncio.create_subprocess_exec(
@@ -112,22 +148,26 @@ class VideoTrackRenderer:
             list[str]: FFmpeg command arguments
         """
         width, height = timeline.resolution.split('x')
-        
-        # Input files: one image per segment
-        # Use video_duration_sec (cut at the next segment's first utterance, i.e. after the
-        # jingle, where the chapter title also switches; see align_cuts_to_segment_starts)
+
+        # Input files: one image per scene (segments are split into scenes; a segment's
+        # scenes together last its video_duration_sec, which ends at the next segment's
+        # first utterance where the chapter title also switches; see
+        # align_cuts_to_segment_starts / assign_scene_times)
+        # -framerate makes the looped image produce output-rate frames, so a pan moves
+        # every output frame instead of every 25 fps input frame.
         input_args = []
-        for seg in timeline.segments:
+        for image_path, duration_sec in timeline.video_scenes():
             input_args.extend([
                 "-loop", "1",
-                "-t", str(seg.video_duration_sec),
-                "-i", str(seg.background_image_path)
+                "-framerate", str(timeline.fps),
+                "-t", str(duration_sec),
+                "-i", str(image_path)
             ])
-        
+
         # Build filter_complex
         filter_parts = []
-        
-        # 1. Concatenate images (segment-based switching)
+
+        # 1. Concatenate images (scene-based switching, optionally panning)
         concat_filter = self._build_concat_filter(timeline, width, height)
         filter_parts.append(concat_filter)
         
@@ -144,9 +184,7 @@ class VideoTrackRenderer:
             *input_args,
             "-filter_complex", filter_complex,
             "-map", "[vout]",
-            "-c:v", "libx264",
-            "-preset", "ultrafast",  # Fast encoding for intermediate file
-            "-crf", "23",
+            *self._video_codec_args(),
             "-r", str(timeline.fps),
             "-pix_fmt", "yuv420p",
             "-t", str(timeline.total_duration_sec),  # Explicit duration to match audio
@@ -167,18 +205,44 @@ class VideoTrackRenderer:
         Returns:
             str: Concat filter string
         """
-        n = len(timeline.segments)
-        
-        # Scale each input to target resolution
+        scenes = timeline.video_scenes()
+        n = len(scenes)
+        pan_ratio = self._pan_ratio()
+
+        # Scale each input to target resolution (and pan it when enabled)
         scale_filters = []
-        for i in range(n):
-            scale_filters.append(f"[{i}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2[v{i}]")
-        
+        for i, (_image, duration_sec) in enumerate(scenes):
+            if pan_ratio > 0:
+                chain = build_pan_filter(int(width), int(height), duration_sec, pan_ratio, i)
+            else:
+                chain = f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
+            scale_filters.append(f"[{i}:v]{chain}[v{i}]")
+
         # Concatenate all scaled inputs
         concat_inputs = "".join(f"[v{i}]" for i in range(n))
         concat_filter = f"{concat_inputs}concat=n={n}:v=1:a=0[vbase]"
-        
+
         return ";".join(scale_filters) + ";" + concat_filter
+
+    def _pan_ratio(self) -> float:
+        """Share of the screen width a scene moves over its length (0 = no pan)."""
+        if not getattr(self.video_config, "enable_pan", False):
+            return 0.0
+        return max(0.0, float(getattr(self.video_config, "pan_ratio", 0.05)))
+
+    def _video_codec_args(self) -> list[str]:
+        """Encoder arguments for the video track.
+
+        libx264 ultrafast by default. video_track_use_gpu switches to NVENC with the
+        same quality settings as the single-image renderer (use_gpu there).
+        """
+        if getattr(self.video_config, "video_track_use_gpu", False):
+            return ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "0"]
+        return [
+            "-c:v", "libx264",
+            "-preset", "ultrafast",  # Fast encoding for intermediate file
+            "-crf", "23",
+        ]
     
     def _build_overlay_filter(self, timeline: VideoTimeline, chapters: list[ChapterMarker]) -> str:
         """Build overlay filters (date, topic titles, subtitles)

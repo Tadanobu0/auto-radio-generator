@@ -545,7 +545,16 @@ video_renderer:
   
   # セグメント単位の背景画像切り替え設定
   background_mode: "dynamic"  # "static": ローカルアセット選択 | "dynamic": FLUX.1動的生成
-  
+
+  # 場面ごとの背景(章を約 90 秒ごとに分け、1 章 1〜4 枚。章タイトル・チャプターは章単位のまま)
+  scene_target_sec: 90.0
+  max_scenes_per_chapter: 4       # 1 にすると従来どおり章 1 枚
+  # 背景のパン(ゆっくり平行移動。場面の長さで画面幅の pan_ratio だけ動く。ズームはしない)
+  enable_pan: true
+  pan_ratio: 0.05
+  # 映像トラックを NVENC でエンコードする(false: libx264 ultrafast)。use_gpu とは別
+  video_track_use_gpu: false
+
   # サムネイル背景生成設定
   thumbnail_background_mode: "dynamic"  # "static": 既存画像使用 | "dynamic": FLUX.1動的生成
   

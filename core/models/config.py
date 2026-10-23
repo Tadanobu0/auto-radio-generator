@@ -432,6 +432,15 @@ class VideoRendererConfig(BaseModel):
     # 背景画像生成設定
     background_mode: str = "static"  # "static" or "dynamic"
     thumbnail_background_mode: str = "static"  # "static" or "dynamic"
+    # 章の中の場面分割(1 章を約 scene_target_sec ごとに 1 枚、1〜max_scenes_per_chapter 枚)
+    scene_target_sec: float = 90.0
+    max_scenes_per_chapter: int = 4
+    # 各場面の背景をゆっくり平行移動させる(場面の長さで画面幅の pan_ratio だけ動く)
+    enable_pan: bool = True
+    pan_ratio: float = 0.05
+    # 映像トラック(Phase B)を NVENC でエンコードするか。use_gpu は 1 枚画像モードだけに効き、
+    # 映像トラックは既定で libx264 ultrafast のまま(009 の試しエンコードを見て PM が決める)
+    video_track_use_gpu: bool = False
 
 
 class FluxConfig(BaseModel):
