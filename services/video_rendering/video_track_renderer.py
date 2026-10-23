@@ -114,7 +114,8 @@ class VideoTrackRenderer:
         width, height = timeline.resolution.split('x')
         
         # Input files: one image per segment
-        # Use video_duration_sec (includes jingle duration) for jingle-synchronized cuts
+        # Use video_duration_sec (cut at the next segment's first utterance, i.e. after the
+        # jingle, where the chapter title also switches; see align_cuts_to_segment_starts)
         input_args = []
         for seg in timeline.segments:
             input_args.extend([
