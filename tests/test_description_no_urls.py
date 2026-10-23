@@ -89,7 +89,7 @@ def test_publish_description_has_no_urls(path):
             assert ref.title.strip() in description
 
     # 目次 (チャプター) は従来どおり
-    assert "【目次】\n00:00 チャプター1" in description
+    assert "【目次】\n0:00 チャプター1\n1:30 チャプター2" in description
 
 
 def test_faultnote_reference_is_title_and_domain():
