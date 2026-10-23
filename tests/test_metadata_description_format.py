@@ -15,7 +15,7 @@ def test_reference_title_url_newline_preserved_after_sanitize():
 
 
 def test_build_video_description_section_spacing_and_reference_block():
-    """セクション間(2行) > セクション内(0〜1行) と参考文献3行構造を検証"""
+    """セクション間(2行) > セクション内(0〜1行) と参考文献1行構造を検証"""
     description = build_video_description(
         script_description="概要テキスト",
         chapters=["00:00 オープニング", "01:00 本編"],
@@ -32,9 +32,9 @@ def test_build_video_description_section_spacing_and_reference_block():
     # セクション間は2行空行、見出し直後は0行
     assert "概要テキスト\n\n\n【目次】\n00:00 オープニング" in description
 
-    # 参考文献は厳密に3行構造
-    assert "📄 Example Title\n🔗 https://example.com\n\n" in description
-    assert "📄 参考文献2\n🔗 https://example.org\n\n" in description
+    # 参考文献は「📄 タイトル(ドメイン名)」の 1 行、URL は載せない
+    assert "📄 Example Title(example.com)\n📄 参考文献2(example.org)\n" in description
+    assert "https://" not in description
 
     # 参考文献セクションも見出し直後は0行
     assert "【参考文献】\n📄 Example Title" in description

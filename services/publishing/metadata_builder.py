@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import List
+from urllib.parse import urlparse
 
 from services.publishing.text_sanitizer import sanitize_for_youtube, validate_chapter_format
 from core.models.research import ResearchSource
@@ -13,6 +15,60 @@ ReferenceEntry = str | ResearchSource
 
 # 免責文 (全動画一律)。説明欄末尾 (使用音声クレジット = footer の直前) に挿入する。
 MEDICAL_DISCLAIMER = "※本動画は一般的な情報提供を目的としており、医学的助言ではありません。"
+
+# 概要欄に載せてはいけない URL (http:// / https:// で始まる文字列)。
+# 2026-10-24: 出典リンク先のドメイン分類を理由に動画が削除されたため、
+# 概要欄には URL を一切載せない (出典は「タイトル(ドメイン名)」で示す)。
+URL_IN_TEXT_PATTERN = re.compile(r"https?://\S*", re.IGNORECASE)
+
+
+def reference_domain(url: str) -> str:
+    """URL からドメイン名 (先頭の www. を除く) を取り出す。取れなければ空文字。"""
+    try:
+        host = urlparse((url or "").strip()).hostname or ""
+    except ValueError:
+        return ""
+    return host[4:] if host.startswith("www.") else host
+
+
+def format_reference_label(ref: ReferenceEntry, idx: int) -> str:
+    """出典 1 件を URL を含まない「タイトル(ドメイン名)」表記にする。
+
+    title が無ければ「参考文献N」、published_date があればドメインの後ろに付ける:
+        環状オリゴ糖の脂質吸収抑制効果(example.com、2026-06-28)
+    """
+    if isinstance(ref, ResearchSource):
+        title = (ref.title or "").strip() or f"参考文献{idx}"
+        url = (ref.url or "").strip()
+        published = (getattr(ref, "published_date", None) or "").strip()
+    else:
+        title = f"参考文献{idx}"
+        url = (ref or "").strip()
+        published = ""
+    meta = [part for part in (reference_domain(url), published) if part]
+    label = f"{title}({'、'.join(meta)})" if meta else title
+    # タイトル自体に URL が入っているソースもあるので、ここでも落とす
+    return strip_urls(label)[0] or f"参考文献{idx}"
+
+
+def strip_urls(text: str) -> tuple[str, List[str]]:
+    """テキストから URL を取り除き、(取り除いた後のテキスト, 取り除いた URL) を返す。
+
+    URL を消した結果、絵文字や記号だけになった行は行ごと落とす。
+    """
+    removed: List[str] = []
+    out_lines: List[str] = []
+    for line in (text or "").split("\n"):
+        found = URL_IN_TEXT_PATTERN.findall(line)
+        if not found:
+            out_lines.append(line)
+            continue
+        removed.extend(found)
+        cleaned = URL_IN_TEXT_PATTERN.sub("", line).rstrip()
+        if not re.search(r"[\w぀-ヿ一-鿿]", cleaned):
+            continue
+        out_lines.append(cleaned)
+    return "\n".join(out_lines), removed
 
 
 def _normalize_non_empty(items: List[str]) -> List[str]:
@@ -89,31 +145,17 @@ def normalize_hashtags(
 
 
 def format_reference_text_lines(references: List[ReferenceEntry]) -> List[str]:
-    """metadata.txt 向けの「タイトル + 日付 + URL」参考文献行を構築する。
+    """metadata.txt 向けの参考文献行を構築する。
 
-    1 文献 2 行 (見出し行 + URL 行) + 区切り空行:
-        参考文献1: 環状オリゴ糖の脂質吸収抑制効果(2026-06-28)
-        https://...
-    published_date が無いソースは日付を省略 (空カッコを出さない)。
-    title が無いソースは現行どおり「参考文献N + URL」のみ。
+    metadata.txt の参考文献は「概要欄用テキスト」として手でコピーされるため、
+    概要欄と同じく URL を載せず 1 文献 1 行の「タイトル(ドメイン名)」にする:
+        参考文献1: 環状オリゴ糖の脂質吸収抑制効果(example.com、2026-06-28)
     """
     lines: List[str] = []
     for idx, ref in enumerate(_normalize_references(references), start=1):
-        if isinstance(ref, ResearchSource):
-            title = (ref.title or "").strip()
-            heading = f"参考文献{idx}: {title}" if title else f"参考文献{idx}"
-            published = (getattr(ref, "published_date", None) or "").strip()
-            if published:
-                heading = f"{heading}({published})"
-            url = (ref.url or "").strip()
-        else:
-            heading = f"参考文献{idx}"
-            url = (ref or "").strip()
-        lines.append(heading)
-        lines.append(url)
-        lines.append("")
-    while lines and lines[-1] == "":
-        lines.pop()
+        label = format_reference_label(ref, idx)
+        # title 無しは label 自体が「参考文献N(...)」なので番号を重ねない
+        lines.append(label if label.startswith(f"参考文献{idx}") else f"参考文献{idx}: {label}")
     return lines
 
 
@@ -133,7 +175,7 @@ def build_video_description(
     2. <空行>
     3. 【目次】(chapters - 00:00 形式)
     4. <空行>
-    5. 【参考文献】(references - 箇条書き)
+    5. 【参考文献】(references - 1 件 1 行の「📄 タイトル(ドメイン名)」。URL は載せない)
     6. <空行>
     7. 【タグ】(dynamic_tags + fixed_tags)
     8. <空行>
@@ -158,23 +200,10 @@ def build_video_description(
         lines.append("- チャプター情報なし")
     _append_section_heading(lines, "【参考文献】", below_blank_lines=0)
     if reference_lines:
+        # 2026-10-24: URL 行 (🔗) を廃止。リンク先ドメインの分類で動画が削除される
+        # ため、出典は「タイトル(ドメイン名)」の 1 行だけにする
         for idx, ref in enumerate(reference_lines, start=1):
-            if isinstance(ref, ResearchSource):
-                title = (ref.title or "").strip() or f"参考文献{idx}"
-                # published_date があればタイトル行に付与 (無ければ日付を省略し
-                # 空カッコを出さない)。1 文献 2 行 (タイトル + URL) を維持する
-                published = (getattr(ref, "published_date", None) or "").strip()
-                if published:
-                    title = f"{title}({published})"
-                url = (ref.url or "").strip()
-                lines.append(f"📄 {title}")
-                lines.append(f"🔗 {url}")
-                lines.append("")  # 3行構造の3行目（空行）
-            else:
-                # 文字列（URL）の場合
-                lines.append(f"📄 参考文献{idx}")
-                lines.append(f"🔗 {ref}")
-                lines.append("")  # 3行構造の3行目（空行）
+            lines.append(f"📄 {format_reference_label(ref, idx)}")
     else:
         lines.append("- 参考文献なし")
     _append_section_heading(lines, "【タグ】", below_blank_lines=0)
@@ -198,6 +227,10 @@ def build_video_description(
     # 最終的なサニタイズと検証
     final_text = "\n".join(lines).strip()
     final_text = sanitize_for_youtube(final_text, max_length=5000)
+    # 概要文 (radio_director 由来)・フッター等に紛れた URL もここで落とす
+    final_text, removed_urls = strip_urls(final_text)
+    if removed_urls:
+        logger.warning("概要欄から URL を %d 件取り除きました: %s", len(removed_urls), removed_urls)
     final_text = final_text.strip()
     
     # チャプター形式の検証
