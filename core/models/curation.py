@@ -37,6 +37,14 @@ class ScriptSegment(BaseModel):
         description="このセグメントまでの文脈要約（次セグメント生成用、200〜300文字）"
     )
     token_count: int = Field(default=0, description="このセグメントの出力トークン数")
+    key_claim_source_idxs: List[int] = Field(
+        default_factory=list,
+        description=(
+            "このセグメントの論点 (show_spec.topics[].key_claims) の出典番号 (登場順)。"
+            "画像プロンプト用の本文抜粋で、各論点が最初に出るターン ([src=N]) を探すのに使う。"
+            "外部台本以外や intro / conclusion では空"
+        ),
+    )
 
 
 class CurationResult(BaseModel):

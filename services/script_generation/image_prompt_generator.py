@@ -1,6 +1,7 @@
 """Image prompt generator for FLUX.1 background images"""
 import logging
-from typing import Optional
+import re
+from typing import List, Optional
 
 from rich.console import Console
 
@@ -33,10 +34,22 @@ class ImagePromptGenerator:
     
     # Prepended by code to every segment prompt (LLM output and fallbacks alike), so the
     # constraint sits at the head of the prompt instead of relying on the LLM to end with it.
+    # Kept short and led by positive wording ("unpopulated, wordless"): FLUX reads negated nouns
+    # as nouns, so every "no X" risks inviting X (e.g. "screen" was dropped for that reason).
     SEGMENT_PROMPT_PREFIX = (
-        "An unpopulated scene with no people, no hands, no faces, "
-        "and no text, lettering, signage, labels or screen interfaces: "
+        "An unpopulated, wordless scene with no people, no hands, no faces, "
+        "no text, signage or labels: "
     )
+
+    # Upper bound for the script excerpt handed to the LLM (same budget as the former
+    # "first 800 chars" excerpt, now spread over the whole segment).
+    MAX_CONTEXT_CHARS = 800
+
+    # Number of evenly spaced excerpt points when a segment has no key-claim anchors.
+    EVEN_EXCERPT_POINTS = 4
+
+    # Citation tags such as [src=3] / [src=1, 2] in verified_script turns.
+    _CITATION_TAG = re.compile(r"\[src=(\d+(?:\s*,\s*\d+)*)\]")
 
     # Upper bound for the final segment prompt (prefix included). FLUX.1 [schnell] is trained
     # with 256 T5 tokens; ComfyUI pads to 256 but does not truncate, so longer prompts run
@@ -58,20 +71,28 @@ ABSOLUTE RULES (MANDATORY - these override everything else):
    - NO text, letters, numbers, captions, signage, labels, logos, or watermarks
    - NO screens, monitors, phone or tablet displays, apps, or user interfaces
    - NO documents, books with visible pages, papers, charts, graphs, diagrams, maps, code, or data visualizations
-   - Devices may appear only switched off or seen from behind/side, with no visible display content
+   - A SMALL DEVICE whose display is part of what it is (a desk sensor, a meter, a thermostat) may show its display window, but ONLY as a dark glass window or a plain colored glow - never digits, letters, or icons
 3. NEVER TRANSCRIBE THE SCRIPT:
    - Do NOT copy names, product names, figures, statistics, or quotes from the script into the prompt
    - Translate the idea into a physical scene instead
 
 PRIMARY FOCUS:
 1. IDENTIFY THE CORE IDEA of the segment, then choose ONE physical scene that symbolizes it:
-   - A place: a room, workshop, studio, laboratory, street, landscape
-   - Tangible objects: instruments, tools, machines, materials, natural elements
-2. DESCRIBE THE SCENE WITH PRECISION:
-   - Be SPECIFIC about objects, materials, and surfaces: name the exact object, what it is made of, its condition, and what it rests on - never a generic category such as "technology" or "research"
+   - Prefer the actual object the script talks about, shown plainly and recognizably, over a symbolic substitute
+   - A place: a room, workshop, studio, kitchen, street, landscape
+   - Tangible objects: everyday things, tools, machines, materials, natural elements
+   - Do NOT default to a bedroom, a hospital, or medical equipment unless the script is actually about them
+2. NAME THE HERO OBJECT PRECISELY - every prompt MUST state all five:
+   - WHAT: the exact main object (never a generic category such as "technology" or "research")
+   - SIZE: its real-world size (palm-sized, knee-high, room-sized ...)
+   - MATERIAL: what it is made of and its finish or condition
+   - PLACE: what it rests on and where in the room or landscape it stands
+   - FRAME SHARE: how much of the frame it fills - 40 to 60 percent, written out (e.g. "filling about half of the frame")
+3. THEN THE ATMOSPHERE:
    - Let LIGHT carry the mood: direction, color, contrast, reflections, haze
    - Let COMPOSITION carry the meaning: scale, distance, symmetry, emptiness, depth
-3. START YOUR PROMPT WITH THE MAIN OBJECT OR PLACE:
+   - Keep supporting objects few and secondary so the hero object stays recognizable
+4. START YOUR PROMPT WITH THE MAIN OBJECT OR PLACE:
    - Make it the hero of the composition
 
 UNIFIED VISUAL BRAND (MANDATORY - Apply consistently):
@@ -93,23 +114,26 @@ CONSTRAINTS (MANDATORY):
 - Use ONLY the Color Palette given above — NEVER reuse colors from the EXAMPLE
   OUTPUTS below (their colors are placeholders illustrating structure only)
 - ALWAYS include film quality keywords
+- ALWAYS state the hero object's size, material, place, and frame share (40-60 percent)
 - Do NOT write "no text" or "no people" yourself — that constraint is added automatically
+- Describe only what IS in the frame. Do not name excluded things even to negate them
+  (never write words such as screen, face, person, or sign) — naming them invites them
 - Keep the prompt to ONE paragraph of 60-110 words
 
 OUTPUT FORMAT:
 Return ONLY the English prompt text, with no explanations and no surrounding quotation marks.
 DO NOT include any Japanese characters in your output.
 
-EXAMPLE OUTPUTS (Scene-Driven, no people, no text):
+EXAMPLE OUTPUTS (Scene-Driven, unpopulated and wordless; the topics are unrelated to yours - copy the structure, never the objects or places):
 
-Example 1 (Medical Topic):
-A small glucose sensor patch and a capped insulin pen resting on a folded linen cloth beside a glass of water on a bedside table, an unmade bed and a softly glowing lamp in the background suggesting someone has just left the room, bathed in soft teal and warm coral neon glow, Clean Minimalist Modern aesthetic, calm and intimate atmosphere, shallow depth of field, shot on Kodak Portra 400 film, subtle film grain, highly detailed
+Example 1 (Everyday Life Topic):
+A small grapefruit-sized cast-iron kettle with a worn black enamel finish and a wooden handle, sitting on a pale stone countertop beside an open kitchen window, filling about half of the frame, a folded linen towel and a small bowl of loose tea leaves behind it, thin steam curling into cool morning air, bathed in soft teal and warm coral neon glow, Clean Minimalist Modern aesthetic, calm and homely atmosphere, close still-life framing, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 
 Example 2 (Technology Topic):
-A long aisle of server racks receding into darkness in an empty data hall, bundled fiber cables arcing overhead and thin haze catching beams of light between the cabinets, a single office chair pushed back from the aisle, bathed in golden amber and deep violet neon glow, Clean Minimalist Modern aesthetic, quiet and focused atmosphere, symmetrical wide shot with strong depth, shot on Kodak Portra 400 film, subtle film grain, highly detailed
+A long aisle of tall black steel server racks receding into darkness in an empty data hall, the racks filling about half of the frame along both sides, bundled fiber cables arcing overhead and thin haze catching beams of light between the cabinets, a single office chair pushed back from the aisle, bathed in golden amber and deep violet neon glow, Clean Minimalist Modern aesthetic, quiet and focused atmosphere, symmetrical wide shot with strong depth, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 
 Example 3 (Environmental Topic):
-A row of cylindrical ice core samples laid on a steel workbench inside a cold research hut, frost on the window and a pair of insulated gloves left beside a thermos, pale daylight spilling across the melting ice, bathed in emerald green and ice blue neon glow, Clean Minimalist Modern aesthetic, urgent and contemplative atmosphere, close still-life framing, shot on Kodak Portra 400 film, subtle film grain, highly detailed
+A row of arm-length cylindrical ice core samples laid on a brushed steel workbench inside a cold research hut, the ice filling the lower half of the frame, frost on the window and a pair of insulated gloves left beside a thermos, pale daylight spilling across the melting ice, bathed in emerald green and ice blue neon glow, Clean Minimalist Modern aesthetic, urgent and contemplative atmosphere, close still-life framing, shot on Kodak Portra 400 film, subtle film grain, highly detailed
 """
     
     THUMBNAIL_SYSTEM_PROMPT_TEMPLATE = """You are a professional cinematographer specializing in creating ABSTRACT, METAPHORICAL, and ATMOSPHERIC YouTube thumbnail backgrounds for radio content.
@@ -227,15 +251,15 @@ Example 3 (Environmental Topic):
 Segment Type: {segment.segment_type}
 Topic: {segment.topic_title or "General discussion"}
 
-Script Content:
+Script Excerpts:
 {segment_context}
 
 INSTRUCTIONS:
-1. Read the script and identify the CORE IDEA of the segment
-2. Choose ONE physical place or object arrangement that symbolizes that idea
-3. Describe it with MAXIMUM SPECIFICITY at the start of your prompt, expressing the idea through objects, light, and composition
-4. Add the unified visual brand (colors, aesthetic, film quality)
-5. No people, hands, or faces; no text, screens, documents, charts, or numbers; never copy names or figures from the script
+1. Read the excerpts (taken from across the whole segment) and identify the CORE IDEA of the segment
+2. Choose ONE physical place or object arrangement that shows that idea - preferably the actual object the script discusses
+3. Start your prompt with the hero object and state its size, material, where it is placed, and that it fills 40-60 percent of the frame
+4. Add light, composition, and the unified visual brand (colors, aesthetic, film quality)
+5. Keep the scene unpopulated and wordless, describing only what is in it; never copy names or figures from the script
 
 Generate the prompt now:"""
         
@@ -285,74 +309,101 @@ Generate the prompt now:"""
     def _build_segment_context(self, segment: ScriptSegment) -> str:
         """Build rich context string from segment for subject-driven prompt generation
         
-        Provides comprehensive script information to enable LLM to identify
-        concrete subjects, objects, and actions discussed in the segment.
-        
+        Provides excerpts from across the whole segment (not only its opening) so the
+        LLM sees the objects and places discussed in the later key points as well.
+
         Args:
             segment: Script segment
-        
+
         Returns:
-            str: Rich context description with full narrative content
+            str: Topic plus dialogue excerpts, at most MAX_CONTEXT_CHARS of dialogue
         """
         context_parts = []
-        
+
         # Add topic if available
         if segment.topic_title:
             context_parts.append(f"Topic: {segment.topic_title}")
-        
-        # Add comprehensive dialogue context (expanded from 3 turns to 10+ turns)
-        if segment.turns and len(segment.turns) > 0:
-            # Strategy: Capture enough turns to convey the segment's core narrative
-            # - For short segments (<5 turns): Include all turns
-            # - For medium segments (5-15 turns): Include first 10 turns
-            # - For long segments (>15 turns): Include first 12 turns + strategic sampling
-            
-            total_turns = len(segment.turns)
-            
-            if total_turns <= 5:
-                # Short segment: include everything
-                sample_turns = segment.turns
-            elif total_turns <= 15:
-                # Medium segment: first 10 turns capture intro + core discussion
-                sample_turns = segment.turns[:10]
-            else:
-                # Long segment: first 12 turns + sample from middle/end
-                # This ensures we capture intro, core points, and conclusion hints
-                sample_turns = segment.turns[:12].copy()  # Explicit copy for clarity
-                mid_point = total_turns // 2
-                # Add 2-3 turns from middle only if they're not already included in first 12
-                if mid_point >= 12:
-                    sample_turns.extend(segment.turns[mid_point:mid_point+2])
-                # Add last 2 turns only if segment is long enough to avoid overlap
-                # (total_turns > 14 ensures last 2 turns are beyond first 12)
-                if total_turns > 14:
-                    sample_turns.extend(segment.turns[-2:])
-            
-            # Extract dialogue text with generous character limit (800 chars)
-            # This allows LLM to grasp concrete subjects and narrative flow
-            dialogue_sample = " ".join([
-                turn.get("text", "") for turn in sample_turns 
-                if turn.get("text")
-            ])
-            
-            if dialogue_sample:
-                # Expand character limit from 200 to 800 to preserve narrative richness
-                # Truncate gracefully at sentence boundary if needed
-                if len(dialogue_sample) > 800:
-                    truncated = dialogue_sample[:800]
-                    # Try to end at last complete sentence
-                    last_period = truncated.rfind('。')
-                    if last_period == -1:
-                        last_period = truncated.rfind('.')
-                    # Use sentence boundary if found and reasonable (not too early)
-                    if last_period > 600:
-                        truncated = truncated[:last_period + 1]
-                    # If no good sentence boundary found, keep full 800 chars (already set)
-                    context_parts.append(f"Discussion:\n{truncated}...")
-                else:
-                    context_parts.append(f"Discussion:\n{dialogue_sample}")
-        
+
+        dialogue = self._select_dialogue_excerpts(segment)
+        if dialogue:
+            context_parts.append(f"Discussion:\n{dialogue}")
+
         return "\n\n".join(context_parts) if context_parts else "General radio discussion"
+
+    def _select_dialogue_excerpts(self, segment: ScriptSegment) -> str:
+        """Pick dialogue excerpts spread over the segment, within MAX_CONTEXT_CHARS.
+
+        - Whole dialogue fits the budget: return it all.
+        - Otherwise quote each anchor turn - the first turn citing each key claim's source
+          ([src=N]), or, when there are no such turns, evenly spaced turns - with the turn
+          before and after it when they fit. The budget is split equally between the anchors
+          (key claims often cluster early in a segment, so a shared window would spend the
+          whole budget on the opening again). The anchor turn itself has priority; neighbours
+          are added only whole and never repeat a turn. Excerpts are joined by newlines.
+        """
+        turns = segment.turns or []
+        texts = [self._CITATION_TAG.sub("", turn.get("text") or "").strip() for turn in turns]
+        whole = " ".join(text for text in texts if text)
+        if len(whole) <= self.MAX_CONTEXT_CHARS:
+            return whole
+
+        anchors = self._key_claim_anchor_turns(turns, segment.key_claim_source_idxs)
+        if not anchors:
+            anchors = self._even_anchor_turns(len(turns))
+
+        separators = len(anchors) - 1
+        budget = (self.MAX_CONTEXT_CHARS - separators) // len(anchors)
+        used = set(anchors)
+        excerpts = []
+        for anchor in anchors:
+            parts = [texts[anchor]] if texts[anchor] else []
+            remaining = budget - len(texts[anchor])
+            for neighbour in (anchor - 1, anchor + 1):
+                if not 0 <= neighbour < len(turns) or neighbour in used or not texts[neighbour]:
+                    continue
+                if len(texts[neighbour]) + 1 > remaining:
+                    continue
+                if neighbour < anchor:
+                    parts.insert(0, texts[neighbour])
+                else:
+                    parts.append(texts[neighbour])
+                used.add(neighbour)
+                remaining -= len(texts[neighbour]) + 1
+            if parts:
+                excerpts.append(self._truncate_excerpt(" ".join(parts), budget))
+        return "\n".join(excerpts)
+
+    def _key_claim_anchor_turns(self, turns: List[dict], source_idxs: List[int]) -> List[int]:
+        """Index of the first turn citing each key claim's source, sorted and deduplicated."""
+        anchors = set()
+        for source_idx in source_idxs:
+            for i, turn in enumerate(turns):
+                cited = {
+                    int(n)
+                    for tag in self._CITATION_TAG.findall(turn.get("text") or "")
+                    for n in tag.split(",")
+                }
+                if source_idx in cited:
+                    anchors.add(i)
+                    break
+        return sorted(anchors)
+
+    def _even_anchor_turns(self, total_turns: int) -> List[int]:
+        """Evenly spaced turn indices (starting at the first turn)."""
+        points = min(self.EVEN_EXCERPT_POINTS, total_turns)
+        return sorted({k * total_turns // points for k in range(points)})
+
+    @staticmethod
+    def _truncate_excerpt(excerpt: str, budget: int) -> str:
+        """Fit an excerpt into budget chars, preferring a sentence end, else ending with '…'."""
+        if len(excerpt) <= budget:
+            return excerpt
+        head = excerpt[:budget]
+        # Japanese sentence ends only: '.' also appears inside figures such as "4.5"
+        last_period = max(head.rfind(mark) for mark in "。！？")
+        if last_period >= budget // 2:
+            return head[:last_period + 1]
+        return excerpt[:budget - 1] + "…"
     
     async def generate_thumbnail_prompt(
         self,
@@ -511,7 +562,7 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
         guidance_map = {
             "intro": """- Narrative Role: Scene-setting and topic introduction
 - Scene Focus: Show the PLACE and the KEY OBJECTS that define this topic, waiting and unattended
-  * For medical topics: an empty consultation room, instruments laid out on a tray, a made bed by a window
+  * For health and lifestyle topics: the very thing the topic is about (a food, a household device, a piece of exercise gear) in the ordinary place where it is used - not hospital equipment unless the script is about a hospital
   * For technology topics: the hardware itself - machines, cables, components, an empty workshop or server hall
   * For social topics: the everyday place where the issue lives - an empty street, classroom, kitchen, or station
 - Visual Details to Emphasize:
@@ -522,10 +573,11 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
             
             "deep_dive": """- Narrative Role: Detailed investigation and analysis
 - Scene Focus: Show the MECHANISM or MATERIAL at the heart of the topic, up close
-  * For medical topics: instruments, samples, vials, or equipment in fine physical detail
+  * For health and lifestyle topics: the topic's own object itself in fine physical detail (its shape, material, and finish), shown as it really looks - not as medical instruments or lab equipment
   * For technology topics: internal components, circuitry, lenses, wiring, or machinery mid-process
   * For social topics: a telling object or trace that embodies the phenomenon
 - Visual Details to Emphasize:
+  * The main object should be clearly identifiable and occupy 40-60% of frame
   * Close-up or detail shots that reveal texture, material, and construction
   * Signs of work in progress: tools set down, parts disassembled, light catching dust or haze
   * Several related objects can be arranged to convey complexity
@@ -533,10 +585,11 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
             
             "conclusion": """- Narrative Role: Synthesis and forward-looking perspective
 - Scene Focus: Show the topic's objects or place in a WIDER CONTEXT that suggests outcome and future
-  * For medical topics: the equipment at rest in a bright, calm room; a window opening onto morning light
+  * For health and lifestyle topics: the topic's own object in daily use at rest in a bright, calm room; a window opening onto morning light
   * For technology topics: the finished object in its setting; a horizon, skyline, or open road beyond it
   * For social topics: the same place at a hopeful hour - dawn light, open doors, a path leading onward
 - Visual Details to Emphasize:
+  * The main object or place should still be clearly identifiable and occupy 40-60% of frame
   * A sense of completion or calm: things put away, light changing, space opening up
   * Forward-looking elements: an open doorway, a path, a horizon, first light
   * Wider framing that places the object within its larger environment

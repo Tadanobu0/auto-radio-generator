@@ -156,6 +156,26 @@ def build_script_segments(vs: VerifiedScript) -> List[ScriptSegment]:
             turns=turn_dicts,
             context_summary="",
             token_count=0,
+            key_claim_source_idxs=_key_claim_source_idxs(vs, seg, deep_dive_counter),
         ))
 
     return segments
+
+
+def _key_claim_source_idxs(vs: VerifiedScript, seg: VSSegment, deep_dive_counter: int) -> List[int]:
+    """deep_dive セグメントに対応する show_spec.topics[].key_claims の出典番号を登場順で返す。
+
+    topic_index が無い deep_dive は出現順 (deep_dive_counter - 1) で対応付ける。
+    intro / conclusion・対応する topic が無い場合は空リスト (画像プロンプト側で等分抜粋になる)。
+    """
+    if seg.segment_type != "deep_dive":
+        return []
+    topic_index = seg.topic_index if seg.topic_index is not None else deep_dive_counter - 1
+    topics = vs.script.show_spec.topics
+    if not 0 <= topic_index < len(topics):
+        return []
+    idxs: List[int] = []
+    for claim in topics[topic_index].key_claims:
+        if claim.source_idx is not None and claim.source_idx not in idxs:
+            idxs.append(claim.source_idx)
+    return idxs
