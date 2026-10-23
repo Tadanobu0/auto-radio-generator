@@ -5,7 +5,8 @@
 - 参考文献: 「📄 タイトル / 🔗 URL / 空行」の 3 行 → 「📄 タイトル(ドメイン名、公開日)」の 1 行。ドメインは先頭の www. を外す。タイトル無しは「参考文献N(ドメイン)」
 - 保険: `build_video_description` の最後と `_upload_to_youtube` のアップロード直前で `strip_urls` を通す(URL は落として続行、ログに件数と URL)。概要文・フッター由来の URL も落ちる
 - metadata.txt の「概要欄用テキスト」の参考文献・概要文からも URL を外した(手で貼る前提のため)
-- arg-remote `test -q`: 660 passed / 1 failed。落ちたのは旧書式(🔗 URL 行)を要求する既存テスト `test_metadata_description_format.py::test_build_video_description_section_spacing_and_reference_block`(ブリーフの「既存テストは変えない」に従い未変更。要判断)
+- 旧書式(🔗 URL 行)を要求していた既存テスト `test_metadata_description_format.py` は PM 判断で期待値を 1 行構造に更新
+- arg-remote `test -q`: 661 passed / 0 failed
 
 ## 画像プロンプトの指示文の改善(ブリーフ 007、006 の「小」)— 2026-10-23 時点
 - ブランチ `pm/007` に実装済み。main へは未マージ。効果は merge・deploy 後の次の /render のコマで見る
