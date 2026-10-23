@@ -5,6 +5,7 @@
 一切載せない。実台本 fixture (tests/fixtures/real_scripts/) の references で確かめる。
 """
 import re
+import unicodedata
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -81,12 +82,18 @@ def test_publish_description_has_no_urls(path):
 
     assert not URL_RE.search(description), description
 
-    # 出典は「タイトル(ドメイン名)」で残っている
-    for ref in vs.metadata.references:
+    # 出典は「📄 タイトル(ドメイン名…)」で、元の順に並ぶ。5000 字上限で末尾の出典が
+    # 切り詰められる回 (sanitize_for_youtube の既存挙動) があるので先頭からの一致で見る
+    ref_lines = [line for line in description.split("\n") if line.startswith("📄 ")]
+    if vs.metadata.references:
+        assert ref_lines
+    for line, ref in zip(ref_lines, vs.metadata.references):
         domain = reference_domain(str(ref.url))
-        assert domain and domain in description
+        assert domain and f"({domain}" in line
         if ref.title:
-            assert ref.title.strip() in description
+            # sanitize_for_youtube が NFC 正規化するので、比較も NFC で揃える
+            title = unicodedata.normalize("NFC", ref.title.strip())
+            assert line.startswith(f"📄 {title}(")
 
     # 目次 (チャプター) は従来どおり
     assert "【目次】\n0:00 チャプター1\n1:30 チャプター2" in description
