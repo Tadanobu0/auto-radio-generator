@@ -1,5 +1,16 @@
 # STATUS
 
+## 背景を場面ごとに増やし、パンを入れる(ブリーフ 009、006 の「中」)— 2026-10-24 時点
+- ブランチ `pm/009` に実装済み。main へは未マージ。効果は merge・deploy 後の次の /render のコマで見る
+- 場面: 章の長さ ÷ 90 秒(四捨五入、1〜4 枚)。等分位置に一番近いターンの頭で切り、±2 ターン以内に新しい論点の出典 `[src=N]` の初出があればそこへ寄せる。4〜5 分の章は 3 枚、21 分の回で約 14 枚の見込み
+- `SegmentTiming.turn_start_secs`(章内の各ターンの開始時刻)を追加。`SegmentTimelineEntry.scenes` に場面を持たせ、映像トラックは `VideoTimeline.video_scenes()` の順に並べる。章タイトル・チャプター・ジングルは章単位のまま(`timeline.segments` は章のまま)
+- 各場面の画像プロンプトはその場面のターンだけから作る(segment_id は `deep_dive_1_scene2` の形。1 場面の章は従来どおり章そのもの)
+- パン: 画面の 1.05 倍に拡大 → crop の x を t の式で動かす。場面の長さで画面幅の 5%(1080p で 96px)、場面ごとに左右交互。ズームなし
+- 設定(`video_renderer`): `scene_target_sec: 90` / `max_scenes_per_chapter: 4`(1 で従来の章 1 枚)/ `enable_pan: true` / `pan_ratio: 0.05` / `video_track_use_gpu: false`(true で映像トラックを NVENC)
+- 試しエンコード(1 分・1080p30・字幕/日付/章タイトルあり、768x432 の素材画像 2 種): libx264 で静止画 3.4〜3.5 秒・3.3〜3.5 MB → パン 3.4〜3.5 秒・3.6〜3.8 MB(サイズ 1.10〜1.11 倍、時間ほぼ同じ)。NVENC はパンで 3.9 秒・2.3〜2.4 MB
+- 映像トラックの既定エンコーダは libx264 のまま(PM 判断待ち。推奨は libx264 のまま)
+- arg-remote `test -q`: 700 passed / 1 skipped(skip は試しエンコード。`-m encode_trial` で 2 passed)
+
 ## 概要欄から出典の生 URL を外す(ブリーフ 008)— 2026-10-24 時点
 - ブランチ `pm/008` に実装済み。main へは未マージ。概要欄の組み立てはこのリポジトリの `services/publishing/metadata_builder.py`(radio_director 側ではない)
 - 参考文献: 「📄 タイトル / 🔗 URL / 空行」の 3 行 → 「📄 タイトル(ドメイン名、公開日)」の 1 行。ドメインは先頭の www. を外す。タイトル無しは「参考文献N(ドメイン)」
