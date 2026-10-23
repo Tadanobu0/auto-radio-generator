@@ -39,6 +39,7 @@ from services.publishing.metadata_builder import (
     MEDICAL_DISCLAIMER,
     format_reference_text_lines,
     normalize_hashtags,
+    strip_urls,
 )
 from services.publishing.text_sanitizer import validate_url, normalize_url
 from core.models.research import ResearchSource
@@ -955,6 +956,14 @@ def _upload_to_youtube(
         callbacks.log("[INFO] MockモードのためYouTubeアップロードを強制的に無効化しました")
 
     if should_upload:
+        # 保険: 概要欄に URL が残っていたら落として (載せずに) 続行する。
+        # 出典リンク先のドメイン分類で動画が削除されたため (2026-10-23)
+        formatted_description, removed_urls = strip_urls(formatted_description)
+        if removed_urls:
+            callbacks.log(
+                f"⚠ 概要欄に URL が {len(removed_urls)} 件残っていたため取り除いてアップロードします: "
+                f"{removed_urls}"
+            )
         callbacks.log("[INFO] YouTubeアップロードを開始します...")
         try:
             youtube_client = YouTubeClient(config)
@@ -1730,7 +1739,7 @@ def _generate_youtube_metadata(
         external_metadata: 外部台本モードの事前構築済み dict (必須)。
                           {title, thumbnail_title, description, hashtags} を持つ。
         references: 参考文献 (ResearchSource)。概要欄用テキストに
-                    「タイトル + 日付 + URL」表記で出力する (2026-07-17)
+                    「タイトル(ドメイン名、日付)」表記で出力する (URL は載せない)
         fixed_tags: 固定タグ (config publishing.default_tags)。テーマ由来タグの
                     後ろに結合し、# 付与・60 個上限の正規化をかける
 
@@ -1753,7 +1762,8 @@ def _generate_youtube_metadata(
     hashtags = list(external_metadata.get("hashtags", []) or [])
     # 2026-07-17: テーマ由来タグに # を付与し先頭へ、固定タグを末尾へ、60 個上限
     normalized_hashtags = normalize_hashtags(hashtags, list(fixed_tags or []))
-    # 2026-07-17: 参考文献を「タイトル + 日付 + URL」表記で概要欄用テキストに載せる
+    # 2026-07-17: 参考文献を概要欄用テキストに載せる
+    # (2026-10-24 から URL は載せず「タイトル(ドメイン名、日付)」表記)
     reference_lines = format_reference_text_lines(list(references or []))
     lines = [
         "=" * 50,
@@ -1780,7 +1790,8 @@ def _generate_youtube_metadata(
         "【概要欄用テキスト】",
         "※ 以下をYouTubeの概要欄にコピー＆ペーストしてください",
         "",
-        metadata["description"],
+        # 概要欄へ貼る前提のブロックなので URL を落とす (2026-10-24)
+        strip_urls(metadata["description"])[0],
         "",
     ])
     if reference_lines:
