@@ -16,6 +16,41 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
+def align_cuts_to_segment_starts(
+    entries: list[SegmentTimelineEntry],
+    segments: list[ScriptSegment],
+    total_duration_sec: float,
+) -> None:
+    """Make each background cut land on the next segment's first utterance.
+
+    The chapter title switches at the next segment's first utterance
+    (VoicevoxClient._build_chapters), so the background must switch there too.
+    Summing per-segment durations (first utterance .. jingle end) left out the
+    2s pre-roll and the inter-phrase pause after each segment's last utterance,
+    so every cut came 2s + 0.25s * k too early (radio_director-013: the next
+    chapter's background with the previous chapter's title).
+
+    The video track concatenates segment images back to back, so the first image
+    starts at 0 and the last one runs to the end of the audio. Segments without
+    turns get no screen time (as before: they have no audio and no jingle).
+    """
+    shown = [i for i, seg in enumerate(segments[:len(entries)]) if seg.turns]
+    if not shown:
+        return
+    prev_cut = 0.0
+    for i, entry in enumerate(entries):
+        if i not in shown:
+            entry.video_duration_sec = 0.0
+            entry.video_cut_time_sec = prev_cut
+            continue
+        k = shown.index(i)
+        cut = entries[shown[k + 1]].audio_start_sec if k + 1 < len(shown) else float(total_duration_sec)
+        cut = max(cut, prev_cut)
+        entry.video_duration_sec = cut - prev_cut
+        entry.video_cut_time_sec = cut
+        prev_cut = cut
+
+
 class TimelineCalculator:
     """Timeline calculation engine
     
@@ -100,6 +135,7 @@ class TimelineCalculator:
             
             # Calculate video timing (for jingle-synchronized transitions)
             # If jingle exists, extend video display until jingle ends (including pre-pause)
+            # (provisional: align_cuts_to_segment_starts below sets the final cut times)
             if jingle_path and jingle_duration and jingle_duration > 0:
                 total_pause_duration = self.pre_jingle_pause_sec + jingle_duration
                 video_duration = timing.duration_sec + total_pause_duration
@@ -135,6 +171,8 @@ class TimelineCalculator:
         # double-count and cause the video timeline to exceed the audio track.
         jingle_count = sum(1 for entry in timeline_entries if entry.jingle_path is not None)
         total_duration_with_pauses = synthesis_result.total_duration_sec
+
+        align_cuts_to_segment_starts(timeline_entries, segments, total_duration_with_pauses)
         
         logger.debug(
             f"Timeline duration: audio={synthesis_result.total_duration_sec:.2f}s, "
