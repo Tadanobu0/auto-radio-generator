@@ -74,17 +74,42 @@ def _write_ass(path: Path) -> Path:
     return path
 
 
-def _trial_timeline(subtitle_path: Path) -> VideoTimeline:
-    images = sorted((REPO_ROOT / "assets" / "backgrounds").glob("*.png"))
-    if not images:
-        pytest.skip("assets/backgrounds に画像が無い")
+TRIAL_IMAGES = [
+    "Abstract_motion_background_representing_energy_and_v_6f0c357b-da4c-4ec7-b051-a6883f8d8723_0.png",
+    "Bright_and_airy_modern_living_room_large_window_with_eedcb042-bbd3-4264-982a-3e86e195bbb9_0.png",
+]
+
+
+def _flux_sized_image(ffmpeg: str, name: str, tmp_path: Path) -> Path:
+    """素材画像を FLUX の出力と同じ 768x432 に縮めたもの (本番はこれを 1920x1080 に拡大して使う)."""
+    src = REPO_ROOT / "assets" / "backgrounds" / name
+    if not src.exists():
+        pytest.skip(f"素材画像が無い: {src}")
+    out = tmp_path / f"flux_{src.stem[:20]}.png"
+    subprocess.run(
+        [ffmpeg, "-y", "-i", str(src), "-vf",
+         "scale=768:432:force_original_aspect_ratio=increase,crop=768:432", str(out)],
+        capture_output=True, check=True,
+    )
+    return out
+
+
+def _distinct_frames(ffmpeg: str, video: Path) -> int:
+    """出力の中の、中身の違うフレームの数 (パンで本当に動いているかの確認)."""
+    proc = subprocess.run([ffmpeg, "-v", "error", "-i", str(video), "-f", "framemd5", "-"], capture_output=True)
+    hashes = [line.split(",")[-1].strip() for line in proc.stdout.decode(errors="replace").splitlines()
+              if line and not line.startswith("#")]
+    return len(set(hashes))
+
+
+def _trial_timeline(subtitle_path: Path, image: Path) -> VideoTimeline:
     # 本番の 1 場面 (約 90 秒) の中の 1 分にあたる: 1 枚を 60 秒ゆっくり動かす
-    scene = SceneTimelineEntry(0, 0, 10, 0.0, TRIAL_SEC, images[0])
+    scene = SceneTimelineEntry(0, 0, 10, 0.0, TRIAL_SEC, image)
     seg = SegmentTimelineEntry(
         segment_id="deep_dive_1", segment_type="deep_dive", topic_title="加湿器の置き場所",
         audio_start_sec=0.0, audio_end_sec=TRIAL_SEC, duration_sec=TRIAL_SEC,
         video_duration_sec=TRIAL_SEC, video_cut_time_sec=TRIAL_SEC,
-        background_image_path=images[0], scenes=[scene],
+        background_image_path=image, scenes=[scene],
     )
     return VideoTimeline(
         segments=[seg], total_duration_sec=TRIAL_SEC,
@@ -111,12 +136,16 @@ def _encode(config, ffmpeg: str, timeline: VideoTimeline, out: Path, pan: bool, 
     }
     if proc.returncode != 0:
         result["error"] = proc.stderr.decode("utf-8", errors="replace")[-600:]
+    else:
+        result["distinct"] = _distinct_frames(ffmpeg, out)
     return result
 
 
-def test_encode_one_minute_static_vs_pan(mock_app_config, tmp_path):
+@pytest.mark.parametrize("image_name", TRIAL_IMAGES)
+def test_encode_one_minute_static_vs_pan(mock_app_config, tmp_path, image_name):
     ffmpeg = _find_ffmpeg()
-    timeline = _trial_timeline(_write_ass(tmp_path / "trial.ass"))
+    image = _flux_sized_image(ffmpeg, image_name, tmp_path)
+    timeline = _trial_timeline(_write_ass(tmp_path / "trial.ass"), image)
     version = subprocess.run([ffmpeg, "-hide_banner", "-version"], capture_output=True).stdout.decode(errors="replace").splitlines()[0]
 
     runs = [
@@ -129,14 +158,14 @@ def test_encode_one_minute_static_vs_pan(mock_app_config, tmp_path):
     base = runs[0]
     print()
     print(f"ENCODE_TRIAL ffmpeg: {version}")
-    print(f"ENCODE_TRIAL image: {timeline.segments[0].background_image_path.name}, {TRIAL_SEC:.0f}s, 1920x1080 30fps, 字幕・日付・章タイトルあり")
+    print(f"ENCODE_TRIAL image: {image_name[:40]} (768x432 に縮小して使用), {TRIAL_SEC:.0f}s, 1920x1080 30fps, 字幕・日付・章タイトルあり")
     for r in runs:
         if not r["ok"]:
             print(f"ENCODE_TRIAL pan={r['pan']} {r['encoder']}: 失敗 {r.get('error', '')}")
             continue
         print(
             f"ENCODE_TRIAL pan={r['pan']} {r['encoder']}: {r['sec']:.1f}s "
-            f"({TRIAL_SEC / r['sec']:.1f}x realtime), {r['mb']:.2f} MB "
+            f"({TRIAL_SEC / r['sec']:.1f}x realtime), {r['mb']:.2f} MB, 違うフレーム {r['distinct']} 枚 "
             f"(静止画 x264 比: 時間 {r['sec'] / base['sec']:.2f} 倍, サイズ {r['mb'] / base['mb']:.2f} 倍)"
             if base["ok"] and base["mb"] > 0 else
             f"ENCODE_TRIAL pan={r['pan']} {r['encoder']}: {r['sec']:.1f}s, {r['mb']:.2f} MB"
@@ -145,3 +174,5 @@ def test_encode_one_minute_static_vs_pan(mock_app_config, tmp_path):
     # libx264 の 2 本は必ず通ること (NVENC はドライバ次第なので数字だけ出す)
     assert runs[0]["ok"], runs[0].get("error")
     assert runs[1]["ok"], runs[1].get("error")
+    # パンでは静止画より明らかに多くのフレームが変わる (= 実際に動いている)
+    assert runs[1]["distinct"] > runs[0]["distinct"] + 50
