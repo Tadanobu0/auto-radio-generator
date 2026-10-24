@@ -19,13 +19,17 @@ VerifiedScript の構造 (Mac 側 SSOT) を Windows 側 `core.models.script.Scri
 `build_script_segments()` を別途公開し、`execute_external_script_phase` 等から
 利用できるようにする。`segment_id` は "intro"、"deep_dive_1/2/3"、"conclusion" の
 形式 (既存 voicevox_client._build_segment_index_map 互換)。
+`segments[].visuals` (spec v1.11.0 §12) は `parse_scene_visuals()` で章ごとに検査し、
+正しいものだけ `ScriptSegment.visuals` に入れる (不正なら警告して None)。
 """
 import logging
 from pathlib import Path
-from typing import List
+from typing import Any, List, Optional
+
+from pydantic import ValidationError
 
 from core.interfaces.script_loader import IScriptLoader
-from core.models.curation import ScriptSegment
+from core.models.curation import SceneVisual, ScriptSegment
 from core.models.script import DialogueTurn, Script, TurnType
 from core.models.verified_script import Segment as VSSegment, VerifiedScript
 
@@ -157,9 +161,63 @@ def build_script_segments(vs: VerifiedScript) -> List[ScriptSegment]:
             context_summary="",
             token_count=0,
             key_claim_source_idxs=_key_claim_source_idxs(vs, seg, deep_dive_counter),
+            visuals=parse_scene_visuals(seg.visuals, len(seg.turns), segment_id),
         ))
 
     return segments
+
+
+# spec v1.11.0 §12: 1 章の場面は 1〜4
+MAX_SCENE_VISUALS = 4
+
+
+def parse_scene_visuals(raw: Any, num_turns: int, segment_id: str) -> Optional[List[SceneVisual]]:
+    """segments[].visuals を検査して SceneVisual のリストにする (spec v1.11.0 §12)。
+
+    - None (欄が無い / null): None。今までどおり scene_splitter で切る
+    - 不正: 警告をログに残して None (その章だけ scene_splitter に戻す。レンダリングは止めない)
+      空リスト / 場面数が 5 以上 / 必須欄が無い・型が違う / draw が空 /
+      start_turn が範囲外・昇順でない・先頭が 0 でない
+    """
+    if raw is None:
+        return None
+    reason = _invalid_scene_visuals_reason(raw, num_turns)
+    if reason:
+        logger.warning(
+            "visuals of %s is invalid (%s); falling back to scene_splitter for this segment",
+            segment_id, reason,
+        )
+        return None
+    return [SceneVisual.model_validate(item) for item in raw]
+
+
+def _invalid_scene_visuals_reason(raw: Any, num_turns: int) -> Optional[str]:
+    """不正なら理由、正しければ None。"""
+    if not isinstance(raw, list):
+        return f"not a list: {type(raw).__name__}"
+    if not raw:
+        return "empty list"
+    if len(raw) > MAX_SCENE_VISUALS:
+        return f"{len(raw)} scenes > {MAX_SCENE_VISUALS}"
+    visuals: List[SceneVisual] = []
+    for k, item in enumerate(raw):
+        try:
+            visuals.append(SceneVisual.model_validate(item))
+        except ValidationError as e:
+            fields = ", ".join(".".join(str(p) for p in err["loc"]) or "item" for err in e.errors())
+            return f"scene {k}: missing or wrong type ({fields})"
+        if not visuals[-1].draw.strip():
+            return f"scene {k}: empty draw"
+    starts = [v.start_turn for v in visuals]
+    if starts[0] != 0:
+        return f"first start_turn is {starts[0]}, not 0"
+    for k, start in enumerate(starts):
+        if not 0 <= start < num_turns:
+            return f"scene {k}: start_turn {start} out of range (0..{num_turns - 1})"
+    for k in range(1, len(starts)):
+        if starts[k] <= starts[k - 1]:
+            return f"scene {k}: start_turn {starts[k]} not after {starts[k - 1]}"
+    return None
 
 
 def _key_claim_source_idxs(vs: VerifiedScript, seg: VSSegment, deep_dive_counter: int) -> List[int]:

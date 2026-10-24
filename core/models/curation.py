@@ -1,6 +1,6 @@
 """キュレーションと台本セグメントのデータモデル"""
 from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CuratedTopic(BaseModel):
@@ -17,6 +17,23 @@ class CuratedTopic(BaseModel):
     selection_reason: str = Field(
         default="",
         description="このトピックを選んだ理由（80〜120字、面白さの核心。下流のSegmentGeneratorに渡される）"
+    )
+
+
+class SceneVisual(BaseModel):
+    """台本側が場面ごとに渡す「何を描くか」(interface_spec §12、verified_script の segments[].visuals[])。
+
+    型は厳密に見る (strict)。"1" や true を start_turn として受けない。
+    範囲・昇順・場面数などの章単位の検査は loader (radio_director_loader) で行う。
+    """
+    model_config = ConfigDict(strict=True)
+
+    start_turn: int = Field(..., description="場面の最初のターン (章の中の番号、0 始まり)")
+    focus: str = Field(..., description="場面の要点")
+    draw: str = Field(..., description="描くもの (主役・台数・置き場所など)")
+    avoid: Optional[str] = Field(
+        default=None,
+        description="描いてはいけないもの (台本の助言と逆の状態など)。ネガティブプロンプトには入れない",
     )
 
 
@@ -44,6 +61,17 @@ class ScriptSegment(BaseModel):
             "画像プロンプト用の本文抜粋で、各論点が最初に出るターン ([src=N]) を探すのに使う。"
             "外部台本以外や intro / conclusion では空"
         ),
+    )
+    visuals: Optional[List[SceneVisual]] = Field(
+        default=None,
+        description=(
+            "台本側が指定した場面 (検査済み)。あれば start_turn で場面を切る。"
+            "None = 指定なし、または不正だったので scene_splitter で切る"
+        ),
+    )
+    scene_visual: Optional[SceneVisual] = Field(
+        default=None,
+        description="このセグメント (場面) の画像に描くもの。画像プロンプトの生成で使う",
     )
 
 

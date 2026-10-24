@@ -246,7 +246,10 @@ Example 3 (Environmental Topic):
         )
         
         # Build user message with scene-translation emphasis
-        user_message = f"""Generate a SCENE-DRIVEN cinematic image prompt for this radio segment.
+        if segment.scene_visual:
+            user_message = self._build_scene_visual_message(segment, segment_context)
+        else:
+            user_message = f"""Generate a SCENE-DRIVEN cinematic image prompt for this radio segment.
 
 Segment Type: {segment.segment_type}
 Topic: {segment.topic_title or "General discussion"}
@@ -329,6 +332,58 @@ Generate the prompt now:"""
             context_parts.append(f"Discussion:\n{dialogue}")
 
         return "\n\n".join(context_parts) if context_parts else "General radio discussion"
+
+    def _build_scene_visual_message(self, segment: ScriptSegment, segment_context: str) -> str:
+        """User message for a scene whose script gives a SceneVisual (spec v1.11.0 §12).
+
+        The scene direction decides the hero object, its count and its place; the
+        excerpts only add detail. "avoid" is not sent to the image model as a negative
+        prompt (FLUX schnell at cfg 1.0 ignores it, and naming a thing invites it): the
+        LLM is asked to draw the correct opposite state and never to name the avoided one.
+        """
+        visual = segment.scene_visual
+        direction = [
+            f"- Point of this scene: {visual.focus}",
+            f"- Draw: {visual.draw}",
+        ]
+        avoid = (visual.avoid or "").strip()
+        if avoid:
+            direction.append(f"- The picture must NOT show: {avoid}")
+        direction_text = "\n".join(direction)
+
+        steps = [
+            "1. Make the hero exactly what \"Draw\" says: the same main objects, in the same NUMBER of units, in the same place",
+            "2. If \"Draw\" names more than one unit, write the count as an English word (two, three ...) and show every unit clearly in the frame; together they fill 40-60 percent of the frame. This count is the one figure you must write",
+        ]
+        if avoid:
+            steps.append(
+                "3. The \"must NOT show\" line is a state the script warns against. Draw the correct "
+                "opposite state instead, stated positively (for example: something that must not sit "
+                "on the floor stands on a shelf, a table, or a stand). Never mention the avoided state, "
+                "its place, or its wording in the prompt - not even negated"
+            )
+        steps += [
+            f"{len(steps) + 1}. Use the excerpts only for details that agree with the scene direction; when they differ, follow the scene direction",
+            f"{len(steps) + 2}. State the hero's size, material, where it is placed, and its frame share; then add light, composition, and the unified visual brand (colors, aesthetic, film quality)",
+            f"{len(steps) + 3}. Keep the scene unpopulated and wordless, describing only what is in it; never copy names from the script",
+        ]
+        instructions = "\n".join(steps)
+
+        return f"""Generate a SCENE-DRIVEN cinematic image prompt for this scene of a radio segment.
+
+Segment Type: {segment.segment_type}
+Topic: {segment.topic_title or "General discussion"}
+
+Scene Direction (from the script writer - this decides what to draw):
+{direction_text}
+
+Script Excerpts (this scene's dialogue):
+{segment_context}
+
+INSTRUCTIONS:
+{instructions}
+
+Generate the prompt now:"""
 
     def _select_dialogue_excerpts(self, segment: ScriptSegment) -> str:
         """Pick dialogue excerpts spread over the segment, within MAX_CONTEXT_CHARS.
