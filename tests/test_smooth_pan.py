@@ -26,12 +26,12 @@ W, H, FPS = 1920, 1080, 30
 ZMIN, ZMAX, FULL = 1.12, 1.22, 90.0
 
 
-def _chain(duration, index=0, fps=FPS, zmin=ZMIN, zmax=ZMAX, full=FULL, width=W, height=H):
-    return build_smooth_pan_filter(width, height, duration, fps, index, zmin, zmax, full)
+def _chain(duration, index=0, fps=FPS, zmin=ZMIN, zmax=ZMAX, full=FULL, width=W, height=H, work=0):
+    return build_smooth_pan_filter(width, height, duration, fps, index, zmin, zmax, full, work)
 
 
 def _persp_options(chain: str) -> dict:
-    body = chain.split("perspective=")[1].split(",setsar")[0]
+    body = chain.split("perspective=")[1].split(",")[0]
     return dict(part.split("=", 1) for part in body.split(":"))
 
 
@@ -134,6 +134,25 @@ def test_zero_length_scene_is_static():
     assert _centre_and_zoom(chain, 1) == pytest.approx((W / 2, ZMIN))
 
 
+def test_work_width_runs_perspective_small_then_scales_to_output():
+    chain = _chain(90.0, 0, work=768)
+    assert chain.startswith("scale=768:432:force_original_aspect_ratio=increase,crop=768:432,format=yuv420p,perspective=")
+    assert chain.endswith(",scale=1920:1080,setsar=1")
+    # 動きは作業用の大きさに比例 (出力では同じ 12%)
+    c0, z0 = _centre_and_zoom(chain, 1, width=768)
+    c1, z1 = _centre_and_zoom(chain, 2700, width=768)
+    assert (c1 - c0) * 1920 / 768 == pytest.approx(W * (ZMIN - 1), abs=0.2)
+    assert (z0, z1) == pytest.approx((ZMIN, ZMAX), abs=1e-3)
+    for n in range(1, 2701, 11):
+        left, right, top, bottom = _window(chain, n)
+        assert 0 <= left < right <= 768 + 1e-6 and 0 <= top < bottom <= 432 + 1e-6
+
+
+def test_work_width_at_or_above_output_means_output_size():
+    assert _chain(90.0, 0, work=1920) == _chain(90.0, 0) == _chain(90.0, 0, work=4000)
+    assert ",scale=1920:1080,setsar" not in _chain(90.0, 0)
+
+
 def test_other_resolution_and_fps():
     chain = _chain(60.0, 0, fps=24, width=1280, height=720)
     assert chain.startswith("scale=1280:720:")
@@ -149,6 +168,8 @@ def test_config_defaults_to_perspective():
     assert vc.enable_pan is True
     assert vc.pan_method == "perspective"
     assert (vc.pan_zoom_min, vc.pan_zoom_max, vc.pan_full_range_sec) == (1.12, 1.22, 90.0)
+    assert vc.pan_work_width == 768
+    assert vc.video_track_x264_preset == "veryfast"
 
 
 def test_config_yaml_selects_perspective():
@@ -158,6 +179,8 @@ def test_config_yaml_selects_perspective():
     vr = data["video_renderer"]
     assert vr["pan_method"] == "perspective"
     assert (vr["pan_zoom_min"], vr["pan_zoom_max"], vr["pan_full_range_sec"]) == (1.12, 1.22, 90.0)
+    assert vr["pan_work_width"] == 768
+    assert vr["video_track_x264_preset"] == "veryfast"
 
 
 def _timeline(durations=(90.0, 90.0, 20.0), fps=30) -> VideoTimeline:
@@ -186,13 +209,23 @@ def _filter_complex(config, timeline=None, **settings):
 def test_render_uses_smooth_pan_by_default(mock_app_config):
     fc = _filter_complex(mock_app_config)
     for i, d in enumerate((90.0, 90.0, 20.0)):
-        assert f"[{i}:v]{_chain(d, i)}[v{i}]" in fc
+        assert f"[{i}:v]{_chain(d, i, work=768)}[v{i}]" in fc
     assert "[v0][v1][v2]concat=n=3:v=1:a=0[vbase]" in fc
 
 
 def test_render_passes_zoom_settings_and_fps(mock_app_config):
-    fc = _filter_complex(mock_app_config, _timeline(fps=24), pan_zoom_min=1.08, pan_zoom_max=1.15, pan_full_range_sec=60.0)
+    fc = _filter_complex(
+        mock_app_config, _timeline(fps=24),
+        pan_zoom_min=1.08, pan_zoom_max=1.15, pan_full_range_sec=60.0, pan_work_width=0,
+    )
     assert _chain(90.0, 0, fps=24, zmin=1.08, zmax=1.15, full=60.0) in fc
+
+
+def test_render_x264_preset_is_configurable(mock_app_config):
+    renderer = VideoTrackRenderer(mock_app_config)
+    mock_app_config.yaml.video_renderer.video_track_x264_preset = "ultrafast"
+    cmd = renderer._build_ffmpeg_command(_timeline(), Path("out.mp4"), [])
+    assert cmd[cmd.index("-preset") + 1] == "ultrafast"
 
 
 def test_render_crop_method_keeps_009_filter(mock_app_config):
@@ -253,9 +286,10 @@ def test_crop_pan_stands_still_then_jumps(tmp_path):
 
 
 @needs_ffmpeg
-def test_smooth_pan_moves_every_frame_by_the_same_amount(tmp_path):
+@pytest.mark.parametrize("work", [0, 768])
+def test_smooth_pan_moves_every_frame_by_the_same_amount(tmp_path, work):
     card = write_blob_card(tmp_path / "card.png")
-    s = _measure(_chain(90.0, 0), card)
+    s = _measure(_chain(90.0, 0, work=work), card)
     expected = W * (ZMIN - 1) / (FULL * FPS)  # 0.085px / コマ
     assert s["frames"] == int(CLIP_SEC * FPS)
     assert s["still"] == 0

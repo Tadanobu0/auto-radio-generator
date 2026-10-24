@@ -559,10 +559,14 @@ video_renderer:
   pan_zoom_min: 1.12
   pan_zoom_max: 1.22
   pan_full_range_sec: 90.0
+  # perspective を掛ける作業用の幅(0 = 出力と同じ)。FLUX の出力の幅で動かしてから 1920x1080 に拡大する
+  pan_work_width: 768
   # crop: 場面の長さで画面幅の pan_ratio だけ動く
   pan_ratio: 0.05
-  # 映像トラックを NVENC でエンコードする(false: libx264 ultrafast)。use_gpu とは別
+  # 映像トラックを NVENC でエンコードする(false: libx264)。use_gpu とは別
   video_track_use_gpu: false
+  # 映像トラックの libx264 の preset(ultrafast だと滑らかなパンで 1 分 32 MB。veryfast は 5.6 MB)
+  video_track_x264_preset: "veryfast"
 
   # サムネイル背景生成設定
   thumbnail_background_mode: "dynamic"  # "static": 既存画像使用 | "dynamic": FLUX.1動的生成

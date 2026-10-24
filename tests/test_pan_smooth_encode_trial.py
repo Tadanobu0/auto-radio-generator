@@ -107,11 +107,32 @@ def _track(ffmpeg, video: Path) -> list[tuple[float, float]]:
     return track_blob(cmd, roi_w, roi_h)
 
 
+def _track_filter_output(config, ffmpeg, timeline, method: str) -> list[tuple[float, float]]:
+    """エンコード前 (フィルタの出力そのもの) の点の位置。"""
+    vc = config.yaml.video_renderer
+    vc.enable_pan, vc.pan_method = True, method
+    defaults = VideoRendererConfig()
+    vc.pan_work_width = defaults.pan_work_width
+    renderer = VideoTrackRenderer(config)
+    inputs = []
+    for image, duration in timeline.video_scenes():
+        inputs += ["-loop", "1", "-framerate", str(timeline.fps), "-t", str(duration), "-i", str(image)]
+    roi_w, roi_h, roi_x, roi_y = ROI
+    fc = renderer._build_concat_filter(timeline, "1920", "1080") + f";[vbase]crop={roi_w}:{roi_h}:{roi_x}:{roi_y}[out]"
+    cmd = [ffmpeg, "-v", "error", *inputs, "-filter_complex", fc, "-map", "[out]", "-f", "rawvideo", "-pix_fmt", "gray", "-"]
+    return track_blob(cmd, roi_w, roi_h)
+
+
 def test_motion_per_frame_crop_vs_perspective(mock_app_config, tmp_path, out_dir):
     ffmpeg = _find_ffmpeg()
     card = write_blob_card(tmp_path / "card.png")
     timeline = _timeline([(card, SCENE_SEC)])
     print()
+    raw = {}
+    for method in ("crop", "perspective"):
+        stats = step_stats(_track_filter_output(mock_app_config, ffmpeg, timeline, method))
+        raw[method] = stats
+        print(f"PAN_TRIAL エンコード前 {format_stats(method, stats)}")
     results = {}
     for method in ("crop", "perspective"):
         video = tmp_path / f"card_{method}.mp4"
@@ -123,18 +144,23 @@ def test_motion_per_frame_crop_vs_perspective(mock_app_config, tmp_path, out_dir
             json.dumps({"stats": stats, "x": [round(p[0], 4) for p in positions]}, ensure_ascii=False),
             encoding="utf-8",
         )
-        print(f"PAN_TRIAL {format_stats(method, stats)} (エンコード {enc['sec']:.1f}s)")
+        print(f"PAN_TRIAL エンコード後 {format_stats(method, stats)} (エンコード {enc['sec']:.1f}s)")
         dx = [b[0] - a[0] for a, b in zip(positions, positions[1:])]
-        print(f"PAN_TRIAL {method} 先頭 60 コマの移動量: " + " ".join(f"{d:+.3f}" for d in dx[:60]))
+        print(f"PAN_TRIAL エンコード後 {method} 先頭 60 コマの移動量: " + " ".join(f"{d:+.3f}" for d in dx[:60]))
 
-    crop, smooth = results["crop"], results["perspective"]
     expected = 1920 * 0.12 / (SCENE_SEC * 30)
-    # crop: ほとんどのコマで止まり、ときどき跳ぶ
-    assert crop["still"] > 0.8 * crop["frames"]
-    # perspective: 全コマが同じだけ動く (エンコード後の映像で測って ±50% 以内)
+    # crop: ほとんどのコマで止まり、ときどき 2px 跳ぶ (フィルタの出力の時点で)
+    assert raw["crop"]["still"] > 0.9 * raw["crop"]["frames"]
+    assert raw["crop"]["max_abs"] >= 0.9
+    # perspective: フィルタの出力では全コマが同じだけ動く
+    smooth = raw["perspective"]
     assert smooth["still"] == 0
-    assert smooth["mean"] == pytest.approx(expected, rel=0.1)
-    assert smooth["min"] > 0.5 * expected and smooth["max"] < 1.5 * expected
+    assert smooth["mean"] == pytest.approx(expected, rel=0.05)
+    assert smooth["min"] > 0.7 * expected and smooth["max"] < 1.3 * expected
+    # エンコード後も平均は同じで、1 コマで 0.5px を超えて跳ぶことはない
+    assert results["perspective"]["mean"] == pytest.approx(expected, rel=0.05)
+    assert results["perspective"]["max_abs"] < 0.5
+    assert results["perspective"]["still"] < 0.02 * results["perspective"]["frames"]
 
 
 def test_frames_of_one_scene_on_real_image(mock_app_config, tmp_path, out_dir):
@@ -156,11 +182,17 @@ def test_encode_time_static_crop_perspective(mock_app_config, tmp_path, image_na
     image = _flux_sized_image(ffmpeg, image_name, tmp_path)
     # 1 分を 2 場面 (40 秒 + 20 秒) にして、場面の切り替えも含める
     timeline = _timeline([(image, 40.0), (image, SPEED_SEC - 40.0)], _write_ass(tmp_path / "trial.ass"))
+    # 静止画・009 (crop) は 009 の既定の ultrafast、perspective は 010 の既定 (作業幅 768・veryfast)
+    settings = {
+        "static": {"video_track_x264_preset": "ultrafast"},
+        "crop": {"video_track_x264_preset": "ultrafast"},
+        "perspective": {},
+    }
     runs = []
     for method in ("static", "crop", "perspective", "static", "crop", "perspective"):
-        runs.append(_encode(mock_app_config, ffmpeg, timeline, tmp_path / f"speed_{method}_{len(runs)}.mp4", method))
+        runs.append(_encode(mock_app_config, ffmpeg, timeline, tmp_path / f"speed_{method}_{len(runs)}.mp4", method, **settings[method]))
     print()
-    print(f"PAN_TRIAL speed image: {image_name[:40]} (768x432), {SPEED_SEC:.0f}s, 1920x1080 30fps, 字幕・日付・章タイトルあり, libx264 ultrafast")
+    print(f"PAN_TRIAL speed image: {image_name[:40]} (768x432), {SPEED_SEC:.0f}s, 1920x1080 30fps, 字幕・日付・章タイトルあり")
     base = min(r["sec"] for r in runs if r["method"] == "static")
     for method in ("static", "crop", "perspective"):
         mine = [r for r in runs if r["method"] == method]

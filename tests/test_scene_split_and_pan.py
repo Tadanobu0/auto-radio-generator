@@ -354,7 +354,8 @@ def test_render_without_pan_keeps_old_scale_pad(mock_app_config):
 def test_video_track_encoder_defaults_to_libx264(mock_app_config):
     cmd = _command(mock_app_config)
     assert cmd[cmd.index("-c:v") + 1] == "libx264"
-    assert cmd[cmd.index("-preset") + 1] == "ultrafast"
+    # 010: 滑らかなパンでファイルが膨らまないよう ultrafast → veryfast (video_track_x264_preset)
+    assert cmd[cmd.index("-preset") + 1] == "veryfast"
 
 
 def test_video_track_encoder_switches_to_nvenc(mock_app_config):
