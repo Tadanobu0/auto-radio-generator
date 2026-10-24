@@ -1,5 +1,11 @@
 # DECISIONS
 
+## 2026-10-25 visuals 欄は loader で章ごとに検査し、avoid は逆の状態を描く指示にする(ブリーフ 011、spec v1.11.0 §12)
+- 決定: `VerifiedScript` の `Segment.visuals` は形を問わず(`Optional[Any]`)受け、`build_script_segments` の `parse_scene_visuals` で章ごとに検査する。正しいものだけ `ScriptSegment.visuals`(SceneVisual は strict。`"3"`・`true`・`3.0` を start_turn として受けない)に入れる。不正なら警告して None にし、その章は scene_splitter に戻す。タイムラインでは start_turn で切り、各場面のコピーに `scene_visual` を付けて画像の依頼に渡す。画像プロンプトの LLM 指示には focus・draw・avoid を「Scene Direction」として入れる。avoid は「逆の状態を肯定形で描き、避ける状態は否定形でも書かない」と指示する
+- 理由: 仕様では、不正な visuals があってもファイル全体を拒否しない。モデルで型付けすると ValidationError で回全体が止まる。ターン数がわかる loader なら範囲の検査もできる。FLUX schnell(cfg 1.0)はネガティブプロンプトが効かず、否定形で書いた物は呼び込む(006・007 の知見)
+- 却下案: モデルで SceneVisual を型付けする(1 章の不正で回全体が止まる)/ タイムラインで検査する(検査が 2 か所に分かれる)/ avoid をネガティブプロンプトに入れる(仕様で禁止。効かない)
+- 補足: visuals がある章は `max_scenes_per_chapter` を見ない(上限は仕様の 4 場面)。ターンの時刻が無い章(推定タイミング)は警告を出して scene_splitter に戻す。visuals の無い場面の指示文は変更前と同じ文面
+
 ## 2026-10-24 パンは perspective で小数ピクセルずつ動かし、ズームを足す(ブリーフ 010)
 - 決定: 画像を作業幅 768 にして、perspective(sense=source、eval=frame、コマ番号 `in` で進める)で動く長方形の窓を写し、1920x1080 に拡大する。画像の中央を画面幅の 12% 平行移動させ、ズームを 1.12 ⇔ 1.22 倍で動かす。速さは 90 秒で全部動く速さに揃える(短い場面は途中まで、長い場面はゆっくり)。009 の crop は `pan_method: crop` で残す
 - 理由: crop・zoompan・overlay は位置が整数ピクセルにしかならず、ゆっくりした動きが「止まって跳ぶ」になる。perspective は 1/256 画素で補間でき、窓を長方形にすればゆがまない。作業幅 1920 だと 1 分 19.8 秒かかるが、768(FLUX の出力の幅)なら 6.4 秒
