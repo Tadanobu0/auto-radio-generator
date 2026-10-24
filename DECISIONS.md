@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-10-25 011 の 1-c(Wi-Fi の回での確認)は別ジョブへ移す(PM 判断)
+- 決定: 011 は 1-a・1-b までで完了とし、merge する。1-c は、先にアップロードなしの /render を別のジョブで作り、その後 radio_director のジョブで Wi-Fi の回を流して確かめる
+- 理由: このジョブからは Wi-Fi の回の verified_script.json(worktree の外)を読めず、arg-remote にもアップロードなしでレンダリングする手段が無い
+- 却下案: 写しを worktree に置いて続きのジョブで確かめる(レンダリングの手段が無いことは変わらない)
+
 ## 2026-10-25 visuals 欄は loader で章ごとに検査し、avoid は逆の状態を描く指示にする(ブリーフ 011、spec v1.11.0 §12)
 - 決定: `VerifiedScript` の `Segment.visuals` は形を問わず(`Optional[Any]`)受け、`build_script_segments` の `parse_scene_visuals` で章ごとに検査する。正しいものだけ `ScriptSegment.visuals`(SceneVisual は strict。`"3"`・`true`・`3.0` を start_turn として受けない)に入れる。不正なら警告して None にし、その章は scene_splitter に戻す。タイムラインでは start_turn で切り、各場面のコピーに `scene_visual` を付けて画像の依頼に渡す。画像プロンプトの LLM 指示には focus・draw・avoid を「Scene Direction」として入れる。avoid は「逆の状態を肯定形で描き、避ける状態は否定形でも書かない」と指示する
 - 理由: 仕様では、不正な visuals があってもファイル全体を拒否しない。モデルで型付けすると ValidationError で回全体が止まる。ターン数がわかる loader なら範囲の検査もできる。FLUX schnell(cfg 1.0)はネガティブプロンプトが効かず、否定形で書いた物は呼び込む(006・007 の知見)

@@ -5,7 +5,8 @@
 - loader: `segments[].visuals` を章ごとに検査する(`parse_scene_visuals`)。不正なものは警告を出し、その章だけ scene_splitter に戻す(範囲外・昇順でない・先頭が 0 でない・0 場面・5 場面以上・draw が空・必須欄が無い・型が違う)。ファイル全体は拒否しない
 - タイムライン: visuals がある章は start_turn で切る。場面の時刻は従来どおり `turn_start_secs`。各場面のコピーに `ScriptSegment.scene_visual` を付けて画像の依頼に渡す
 - 画像プロンプト: focus・draw・avoid を LLM の指示に入れる。台数は英語の数詞で書かせる。avoid は逆の状態を肯定形で描かせ、ネガティブプロンプトには入れない。visuals の無い場面の指示文は変更前と同じ
-- 1-c(Wi-Fi の回での確認)は未実施。このジョブからは Wi-Fi 回の verified_script.json と specs リポジトリを読めない。arg-remote にもアップロードなしでレンダリングする手段が無い(報告 011 の要判断事項)
+- 1-c(Wi-Fi の回での確認)は未実施。このジョブからは Wi-Fi 回の verified_script.json と specs リポジトリを読めない。arg-remote にもアップロードなしでレンダリングする手段が無い
+- 1-c は別ジョブへ移した(2026-10-25 PM 判断)。先にアップロードなしの /render を別ジョブで作り、その後 radio_director のジョブで Wi-Fi の回を流して確かめる。011 は 1-a・1-b までで完了とし、merge する
 - arg-remote `test -q`: 768 passed / 8 skipped(skip は試しエンコード)
 
 ## パンの滑らかさと動きの量、章タイトルの帯と日付の重なり(ブリーフ 010)— 2026-10-24 時点
