@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-10-25 アップロードしない実行は環境変数 ARG_NO_UPLOAD と skip_upload 引数で切る(ブリーフ 012)
+- 決定: `run_workflow_sync(skip_upload=True)` か、環境変数 `ARG_NO_UPLOAD` が `1`/`true`/`yes`/`on` のとき、YouTube への公開(`_upload_to_youtube` 全体。サムネ設定・再生リスト追加を含む)だけを飛ばす。`upload_override` より優先する。既定(どちらも無し)は今までどおり。結果は `WorkflowResult.upload_skipped` に入れ、`build_upload_result_fields(result)` が result.json に足す欄(`upload_skipped` / `upload_status` / `video_path`)を返す
+- 理由: run_remote.py と launch.ps1 はこのリポジトリに無い(履歴にも無く、Windows の本番ツリーにも無い)。環境変数なら launch.ps1 がそのプロセスにだけ設定すれば、run_remote.py の改修前でも公開が止まる。止める向きなので、どこから来ても優先して安全
+- 却下案: config.yaml の `publishing.enable_upload` を切る(ファイルの書き換えが要り、戻し忘れで本番の公開が止まる)/ user_settings.json に項目を足す(upload の項目が無く、UI の設定保存と混ざる)/ 引数だけ(run_remote.py の改修が済むまで使えない)
+
 ## 2026-10-25 011 の 1-c(Wi-Fi の回での確認)は別ジョブへ移す(PM 判断)
 - 決定: 011 は 1-a・1-b までで完了とし、merge する。1-c は、先にアップロードなしの /render を別のジョブで作り、その後 radio_director のジョブで Wi-Fi の回を流して確かめる
 - 理由: このジョブからは Wi-Fi の回の verified_script.json(worktree の外)を読めず、arg-remote にもアップロードなしでレンダリングする手段が無い
