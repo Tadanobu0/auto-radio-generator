@@ -5,6 +5,7 @@
 """
 import asyncio
 import logging
+import os
 import re
 import sys
 import time
@@ -99,6 +100,7 @@ class WorkflowResult:
     formatted_title: str = ""  # 日付入りタイトル（コピー用）
     formatted_description: str = ""  # 概要欄・チャプター結合版（コピー用）
     uploaded_video_url: Optional[str] = None  # YouTubeアップロードURL（成功時）
+    upload_skipped: bool = False  # アップロードしない実行で公開を飛ばしたか（012）
     # サムネイル再作成用
     theme: str = ""  # 元のテーマ
     output_dir: Optional[Path] = None  # 出力先ディレクトリ
@@ -911,6 +913,38 @@ def _run_metadata_phase(
     return metadata_path, generated_metadata
 
 
+# アップロードしない実行のスイッチ (ブリーフ 012)。Mac 側の launch.ps1 が
+# このプロセスにだけ設定する。"1" / "true" / "yes" / "on" で有効 (大小無視)。
+NO_UPLOAD_ENV = "ARG_NO_UPLOAD"
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def no_upload_requested(environ: Optional[dict] = None) -> bool:
+    """環境変数 ARG_NO_UPLOAD でアップロードしない実行が指定されているか。"""
+    env = os.environ if environ is None else environ
+    return str(env.get(NO_UPLOAD_ENV, "")).strip().lower() in _TRUTHY
+
+
+def build_upload_result_fields(result: "WorkflowResult") -> dict:
+    """result.json に足す、公開の有無と mp4 のパスの欄を返す（012）。
+
+    既存の欄は変えず、ここで返す欄を足すだけにする想定。
+    upload_status は "uploaded"（公開した）/ "skipped"（アップロードしない実行）/
+    "not_uploaded"（設定で無効・Mock・アップロード失敗）のどれか。
+    """
+    if result.upload_skipped:
+        status = "skipped"
+    elif result.uploaded_video_url:
+        status = "uploaded"
+    else:
+        status = "not_uploaded"
+    return {
+        "upload_skipped": bool(result.upload_skipped),
+        "upload_status": status,
+        "video_path": str(result.video_path) if result.video_path else None,
+    }
+
+
 def _upload_to_youtube(
     *,
     config: AppConfig,
@@ -1217,6 +1251,7 @@ def run_workflow_sync(
     footer_text_override: Optional[str] = None,
     research_import_filepath: Optional[str] = None,
     external_script_path: Optional[str] = None,
+    skip_upload: bool = False,
 ) -> WorkflowResult:
     """同期版ワークフロー実行（Gradio から呼び出し用 / 外部台本モード前提）
 
@@ -1234,6 +1269,10 @@ def run_workflow_sync(
         footer_text_override: 概要欄フッター文（UI入力優先）
         research_import_filepath: research_brief.json インポート（参考保持用）
         external_script_path: VerifiedScript JSON のパス（必須）
+        skip_upload: True なら YouTube への公開（サムネ設定・再生リスト追加を含む）
+            だけを飛ばす。音声・画像・字幕・エンコード・メタデータ・サムネ画像は
+            本番と同じに作る。環境変数 ARG_NO_UPLOAD=1 でも同じになり、
+            どちらかが指定されれば upload_override より優先する（012）
 
     Returns:
         WorkflowResult: 実行結果（Usage/Cost情報含む）
@@ -1576,17 +1615,26 @@ def run_workflow_sync(
             cost_report = cost_calculator.format_cost_report(total_usage, cost)
 
             # YouTubeアップロード（失敗しても動画生成結果は成功扱い）
-            uploaded_video_url = _upload_to_youtube(
-                config=config,
-                use_mock=use_mock,
-                upload_override=upload_override,
-                publishing_config=publishing_config,
-                video_path=production_result.video_path,
-                formatted_title=formatted_title,
-                formatted_description=formatted_description,
-                thumbnail_path=thumbnail_path,
-                callbacks=callbacks,
-            )
+            # アップロードしない実行では公開だけを飛ばす（012）
+            upload_skipped = bool(skip_upload or no_upload_requested())
+            if upload_skipped:
+                uploaded_video_url = None
+                callbacks.log(
+                    "[INFO] アップロードしない実行のため YouTube への公開"
+                    f"（サムネ設定・再生リスト追加を含む）を飛ばしました: {production_result.video_path}"
+                )
+            else:
+                uploaded_video_url = _upload_to_youtube(
+                    config=config,
+                    use_mock=use_mock,
+                    upload_override=upload_override,
+                    publishing_config=publishing_config,
+                    video_path=production_result.video_path,
+                    formatted_title=formatted_title,
+                    formatted_description=formatted_description,
+                    thumbnail_path=thumbnail_path,
+                    callbacks=callbacks,
+                )
 
             # ========== 実行ログ・コスト履歴の記録 ==========
             _record_execution_logs(
@@ -1623,6 +1671,7 @@ def run_workflow_sync(
                 formatted_title=formatted_title,
                 formatted_description=formatted_description,
                 uploaded_video_url=uploaded_video_url,
+                upload_skipped=upload_skipped,
                 theme=theme,
                 output_dir=output_base,
                 segment_bg_generation_time=segment_bg_time,
