@@ -18,6 +18,7 @@ import pytest
 
 from core.interfaces import ChapterMarker
 from core.models import SceneTimelineEntry, SegmentTimelineEntry, VideoTimeline
+from core.models.config import VideoRendererConfig
 from services.video_rendering.video_track_renderer import VideoTrackRenderer
 from tests.pan_measure import format_stats, step_stats, track_blob, write_blob_card
 from tests.test_video_track_pan_encode_trial import TRIAL_IMAGES, _find_ffmpeg, _flux_sized_image, _write_ass
@@ -69,11 +70,16 @@ def _timeline(scenes: list[tuple[Path, float]], subtitle_path=None) -> VideoTime
     )
 
 
-def _encode(config, ffmpeg, timeline, out: Path, method: str, chapters=None) -> dict:
+def _encode(config, ffmpeg, timeline, out: Path, method: str, chapters=None, **settings) -> dict:
     vc = config.yaml.video_renderer
     vc.enable_pan = method != "static"
     vc.pan_method = method if method != "static" else "perspective"
     vc.video_track_use_gpu = False
+    defaults = VideoRendererConfig()
+    vc.pan_work_width = defaults.pan_work_width
+    vc.video_track_x264_preset = defaults.video_track_x264_preset
+    for key, value in settings.items():
+        setattr(vc, key, value)
     renderer = VideoTrackRenderer(config)
     renderer.ffmpeg_path = ffmpeg
     if chapters is None:
@@ -165,6 +171,59 @@ def test_encode_time_static_crop_perspective(mock_app_config, tmp_path, image_na
             f"(速い方 {best:.1f}s = 静止画の {best / base:.2f} 倍, {SPEED_SEC / best:.1f}x realtime), "
             f"{mine[0]['mb']:.2f} MB"
         )
+
+
+VARIANTS = [
+    # (名前, 方式, 設定)
+    ("static ultrafast", "static", {}),
+    ("crop ultrafast", "crop", {}),
+    ("persp1920 ultrafast", "perspective", {"pan_work_width": 0}),
+    ("persp960 ultrafast", "perspective", {"pan_work_width": 960}),
+    ("persp768 ultrafast", "perspective", {"pan_work_width": 768}),
+    ("persp960 superfast", "perspective", {"pan_work_width": 960, "video_track_x264_preset": "superfast"}),
+    ("persp768 superfast", "perspective", {"pan_work_width": 768, "video_track_x264_preset": "superfast"}),
+    ("persp768 veryfast", "perspective", {"pan_work_width": 768, "video_track_x264_preset": "veryfast"}),
+    ("persp960 nvenc", "perspective", {"pan_work_width": 960, "video_track_use_gpu": True}),
+    ("persp768 nvenc", "perspective", {"pan_work_width": 768, "video_track_use_gpu": True}),
+]
+MOTION_SEC = 30.0
+
+
+def test_variants_speed_size_and_motion(mock_app_config, tmp_path, out_dir):
+    """作業用の幅 × エンコーダの組み合わせごとに、1 分の時間・サイズと、点の画像のコマごとの動き。"""
+    ffmpeg = _find_ffmpeg()
+    image = _flux_sized_image(ffmpeg, TRIAL_IMAGES[1], tmp_path)
+    ass = _write_ass(tmp_path / "trial.ass")
+    speed_tl = _timeline([(image, 40.0), (image, SPEED_SEC - 40.0)], ass)
+    card = write_blob_card(tmp_path / "card.png")
+    motion_tl = _timeline([(card, MOTION_SEC)])
+    print()
+    print(f"PAN_VARIANT 1 分 (40 秒 + 20 秒の 2 場面, 1920x1080 30fps, 字幕・日付・章タイトルあり, 素材 {TRIAL_IMAGES[1][:30]} 768x432)")
+    rows = []
+    for k, (name, method, settings) in enumerate(VARIANTS):
+        try:
+            times = []
+            for rep in range(2):
+                enc = _encode(mock_app_config, ffmpeg, speed_tl, tmp_path / f"v{k}_{rep}.mp4", method, **settings)
+                times.append(enc["sec"])
+            card_video = tmp_path / f"v{k}_card.mp4"
+            _encode(mock_app_config, ffmpeg, motion_tl, card_video, method, **settings)
+            stats = step_stats(_track(ffmpeg, card_video))
+        except AssertionError as e:
+            print(f"PAN_VARIANT {name}: 失敗 {str(e)[-300:]}")
+            continue
+        rows.append((name, min(times), enc["mb"], stats))
+    base = rows[0][1]
+    for name, sec, mb, s in rows:
+        print(
+            f"PAN_VARIANT {name}: {sec:.1f}s (静止画の {sec / base:.2f} 倍, 14 分なら {sec * 14:.0f}s), {mb:.2f} MB/分, "
+            f"点の移動 平均 {s['mean']:+.4f} 標準偏差 {s['std']:.4f} 最小 {s['min']:+.4f} 最大 {s['max']:+.4f} px/コマ, "
+            f"止まったコマ {s['still']}/{s['frames']}"
+        )
+    (out_dir / "variants.json").write_text(
+        json.dumps([{"name": n, "sec": t, "mb": m, "stats": s} for n, t, m, s in rows], ensure_ascii=False, indent=1),
+        encoding="utf-8",
+    )
 
 
 def test_long_titles_with_date(mock_app_config, tmp_path, out_dir):

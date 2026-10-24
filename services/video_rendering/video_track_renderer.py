@@ -92,19 +92,28 @@ def build_smooth_pan_filter(
     zoom_min: float,
     zoom_max: float,
     full_range_sec: float,
+    work_width: int = 0,
 ) -> str:
     """Filter chain that slowly pans and zooms one still image with sub-pixel steps.
 
     crop (build_pan_filter) can only move by whole pixels (by 2 on yuv420p), so a slow
-    pan stands still for dozens of frames and then jumps. Here the image is scaled to the
-    frame and perspective (sense=source) maps a moving window of it onto the whole frame,
-    resampling with 1/256-pixel precision every frame. The window is a plain rectangle
-    (zoom + translation only); see smooth_pan_window for the motion. perspective has no
-    time variable, so progress uses the input frame number `in` (1 for the first frame).
+    pan stands still for dozens of frames and then jumps. Here the image is scaled to a
+    working size and perspective (sense=source) maps a moving window of it onto the whole
+    working frame, resampling with 1/256-pixel precision every frame; the result is then
+    scaled to the output. perspective recomputes its per-pixel map every frame on one
+    thread, so a working size below the output (work_width; 0 = output width) keeps it
+    cheap. The window is a plain rectangle (zoom + translation only); see
+    smooth_pan_window for the motion. perspective has no time variable, so progress uses
+    the input frame number `in` (1 for the first frame).
     """
-    z0, dz, o0, do = smooth_pan_window(width, duration_sec, scene_index, zoom_min, zoom_max)
-    half_w = width / 2
-    half_h = height / 2
+    if work_width <= 0 or work_width >= width:
+        work_w, work_h = width, height
+    else:
+        work_w = _even(work_width)
+        work_h = _even(work_width * height / width)
+    z0, dz, o0, do = smooth_pan_window(work_w, duration_sec, scene_index, zoom_min, zoom_max)
+    half_w = work_w / 2
+    half_h = work_h / 2
     if dz == 0 and do == 0:
         z, o, eval_mode = f"{z0:.6f}", f"{o0:.4f}", "init"
     else:
@@ -118,13 +127,15 @@ def build_smooth_pan_filter(
     right = f"{half_w:g}-({o}-{half_w:g})/{z}"
     top = f"{half_h:g}-{half_h:g}/{z}"
     bottom = f"{half_h:g}+{half_h:g}/{z}"
+    upscale = f"scale={width}:{height}," if (work_w, work_h) != (width, height) else ""
     return (
-        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},"
+        f"scale={work_w}:{work_h}:force_original_aspect_ratio=increase,"
+        f"crop={work_w}:{work_h},"
         f"format=yuv420p,"
         f"perspective=x0={left}:y0={top}:x1={right}:y1={top}:"
         f"x2={left}:y2={bottom}:x3={right}:y3={bottom}:"
         f"interpolation=linear:sense=source:eval={eval_mode},"
+        f"{upscale}"
         f"setsar=1"
     )
 
@@ -294,6 +305,7 @@ class VideoTrackRenderer:
                     float(getattr(vc, "pan_zoom_min", 1.12)),
                     float(getattr(vc, "pan_zoom_max", 1.22)),
                     float(getattr(vc, "pan_full_range_sec", 90.0)),
+                    int(getattr(vc, "pan_work_width", 0)),
                 )
             elif pan_method == "crop" and pan_ratio > 0:
                 chain = build_pan_filter(int(width), int(height), duration_sec, pan_ratio, i)
@@ -326,14 +338,14 @@ class VideoTrackRenderer:
     def _video_codec_args(self) -> list[str]:
         """Encoder arguments for the video track.
 
-        libx264 ultrafast by default. video_track_use_gpu switches to NVENC with the
-        same quality settings as the single-image renderer (use_gpu there).
+        libx264 (preset video_track_x264_preset) by default. video_track_use_gpu switches
+        to NVENC with the same quality settings as the single-image renderer (use_gpu there).
         """
         if getattr(self.video_config, "video_track_use_gpu", False):
             return ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "23", "-b:v", "0"]
         return [
             "-c:v", "libx264",
-            "-preset", "ultrafast",  # Fast encoding for intermediate file
+            "-preset", str(getattr(self.video_config, "video_track_x264_preset", "ultrafast")),
             "-crf", "23",
         ]
     

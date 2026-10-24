@@ -446,11 +446,16 @@ class VideoRendererConfig(BaseModel):
     pan_zoom_min: float = 1.12
     pan_zoom_max: float = 1.22
     pan_full_range_sec: float = 90.0
+    # perspective を掛ける作業用の幅(0 = 出力と同じ)。perspective は毎コマ 1 スレッドで画素ごとの
+    # 対応表を作り直すので、小さい画像で動かしてから出力の大きさに拡大する
+    pan_work_width: int = 0
     # crop: 場面の長さで画面幅の pan_ratio だけ動く
     pan_ratio: float = 0.05
     # 映像トラック(Phase B)を NVENC でエンコードするか。use_gpu は 1 枚画像モードだけに効き、
     # 映像トラックは既定で libx264 ultrafast のまま(009 の試しエンコードを見て PM が決める)
     video_track_use_gpu: bool = False
+    # 映像トラックの libx264 の preset
+    video_track_x264_preset: str = "ultrafast"
 
 
 class FluxConfig(BaseModel):
