@@ -8,7 +8,7 @@
 - パン: 画面の 1.05 倍に拡大 → crop の x を t の式で動かす。場面の長さで画面幅の 5%(1080p で 96px)、場面ごとに左右交互。ズームなし
 - 設定(`video_renderer`): `scene_target_sec: 90` / `max_scenes_per_chapter: 4`(1 で従来の章 1 枚)/ `enable_pan: true` / `pan_ratio: 0.05` / `video_track_use_gpu: false`(true で映像トラックを NVENC)
 - 試しエンコード(1 分・1080p30・字幕/日付/章タイトルあり、768x432 の素材画像 2 種): libx264 で静止画 3.4〜3.5 秒・3.3〜3.5 MB → パン 3.4〜3.5 秒・3.6〜3.8 MB(サイズ 1.10〜1.11 倍、時間ほぼ同じ)。NVENC はパンで 3.9 秒・2.3〜2.4 MB
-- 映像トラックの既定エンコーダは libx264 のまま(PM 判断待ち。推奨は libx264 のまま)
+- 映像トラックの既定エンコーダは libx264 ultrafast のまま(2026-10-24 PM 判断。NVENC は `video_track_use_gpu` で切り替え可)
 - arg-remote `test -q`: 700 passed / 1 skipped(skip は試しエンコード。`-m encode_trial` で 2 passed)
 
 ## 概要欄から出典の生 URL を外す(ブリーフ 008)— 2026-10-24 時点
