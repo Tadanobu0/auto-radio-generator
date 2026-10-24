@@ -11,6 +11,22 @@ from typing import Optional
 
 
 @dataclass
+class SceneTimelineEntry:
+    """One background image shown inside a segment (chapter).
+
+    A chapter is split into 1-4 scenes at turn starts; each scene gets its own image.
+    Chapter titles and YouTube chapters stay per segment; only the background
+    switches per scene.
+    """
+    scene_index: int                          # 0-based index within the segment
+    start_turn: int                           # First turn of the scene (index in segment.turns)
+    end_turn: int                             # One past the last turn of the scene
+    video_start_sec: float                    # When the scene's image appears
+    video_duration_sec: float                 # How long it stays on screen
+    background_image_path: Path               # Image for this scene
+
+
+@dataclass
 class SegmentTimelineEntry:
     """Timeline information for a single segment
     
@@ -36,6 +52,9 @@ class SegmentTimelineEntry:
     jingle_start_sec: Optional[float] = None  # Jingle start time (e.g., 1 sec before segment end)
     jingle_duration_sec: Optional[float] = None  # Jingle duration
     pause_after_sec: Optional[float] = None   # Pause duration inserted after this segment
+    # Scenes inside the segment, back to back from the segment's video start to its cut.
+    # Empty = the whole segment shows background_image_path (single scene).
+    scenes: list[SceneTimelineEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -59,3 +78,17 @@ class VideoTimeline:
     resolution: str = "1920x1080"             # Output resolution
     fps: int = 30                             # Output FPS
     subtitle_path: Optional[Path] = None      # Subtitle file (.ass)
+
+    def video_scenes(self) -> list[tuple[Path, float]]:
+        """(image, on-screen seconds) for every background, in order.
+
+        The video track concatenates these back to back from 0 s. Segments
+        without scenes count as one scene with the segment's own image.
+        """
+        shown: list[tuple[Path, float]] = []
+        for seg in self.segments:
+            if seg.scenes:
+                shown.extend((sc.background_image_path, sc.video_duration_sec) for sc in seg.scenes)
+            else:
+                shown.append((seg.background_image_path, seg.video_duration_sec))
+        return shown

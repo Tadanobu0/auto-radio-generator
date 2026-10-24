@@ -30,6 +30,9 @@ class SegmentTiming:
     duration_sec: float                # Segment duration
     jingle_path: Optional[Path] = None # Jingle file selected by VoicevoxClient (single source of truth)
     jingle_duration: Optional[float] = None  # Jingle duration in seconds
+    # Start time (sec, same clock as start_sec) of each turn in the segment, in turn order.
+    # Empty when unknown (estimated timing, empty segment). Used to cut scenes at turn starts.
+    turn_start_secs: list[float] = field(default_factory=list)
 
 
 @dataclass

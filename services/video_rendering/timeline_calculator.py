@@ -8,9 +8,10 @@ from pathlib import Path
 
 from rich.console import Console
 
-from core.models import AppConfig, ScriptSegment, SegmentTimelineEntry, VideoTimeline
+from core.models import AppConfig, SceneTimelineEntry, ScriptSegment, SegmentTimelineEntry, VideoTimeline
 from core.interfaces import SynthesisResult, SegmentTiming
 from services.media_processing import ImageProvider, JingleProvider
+from .scene_splitter import split_scene_starts
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -51,6 +52,28 @@ def align_cuts_to_segment_starts(
         prev_cut = cut
 
 
+def assign_scene_times(entry: SegmentTimelineEntry, turn_start_secs: list[float]) -> None:
+    """Place the entry's scenes back to back over its video span.
+
+    The first scene starts with the segment's image (video start, i.e. right after
+    the previous cut), every later scene at its first turn's start, and the last
+    one runs to the segment's cut. So the scene images cover exactly the segment's
+    screen time and the chapter boundaries do not move.
+    """
+    if not entry.scenes:
+        return
+    video_start = entry.video_cut_time_sec - entry.video_duration_sec
+    cut = entry.video_cut_time_sec
+    bounds = [video_start]
+    for scene in entry.scenes[1:]:
+        t = turn_start_secs[scene.start_turn] if scene.start_turn < len(turn_start_secs) else cut
+        bounds.append(min(max(t, bounds[-1]), cut))
+    bounds.append(cut)
+    for k, scene in enumerate(entry.scenes):
+        scene.video_start_sec = bounds[k]
+        scene.video_duration_sec = bounds[k + 1] - bounds[k]
+
+
 class TimelineCalculator:
     """Timeline calculation engine
     
@@ -71,7 +94,37 @@ class TimelineCalculator:
         self.jingle_overlap_sec = getattr(video_config, "jingle_overlap_sec", 3.0) if video_config else 3.0
         self.enable_jingles = getattr(video_config, "enable_jingles", True) if video_config else True
         self.pre_jingle_pause_sec = getattr(video_config, "pre_jingle_pause_sec", 0.5) if video_config else 0.5
-    
+        self.scene_target_sec = getattr(video_config, "scene_target_sec", 90.0) if video_config else 90.0
+        self.max_scenes_per_chapter = getattr(video_config, "max_scenes_per_chapter", 4) if video_config else 4
+
+    def _plan_scene_starts(self, segment: ScriptSegment, timing: SegmentTiming) -> list[int]:
+        """First turn of each scene in the segment ([0] = one image for the whole segment)."""
+        turn_starts = list(getattr(timing, "turn_start_secs", None) or [])
+        if not segment.turns or len(turn_starts) != len(segment.turns):
+            return [0]
+        # Speech span of the segment (the last segment's end_sec includes the post-roll;
+        # that only nudges the even positions slightly)
+        return split_scene_starts(
+            turn_starts,
+            timing.end_sec,
+            turns=segment.turns,
+            key_claim_source_idxs=segment.key_claim_source_idxs,
+            target_sec=self.scene_target_sec,
+            max_scenes=self.max_scenes_per_chapter,
+        )
+
+    @staticmethod
+    def _scene_segment(segment: ScriptSegment, scene_index: int, start_turn: int, end_turn: int) -> ScriptSegment:
+        """The segment narrowed to one scene's turns (for that scene's image prompt).
+
+        Topic, type and key claims stay the same, so the prompt keeps the chapter's
+        subject while the excerpt (and so the pictured object) comes from the scene.
+        """
+        return segment.model_copy(update={
+            "segment_id": f"{segment.segment_id}_scene{scene_index + 1}",
+            "turns": segment.turns[start_turn:end_turn],
+        })
+
     async def calculate_timeline(
         self,
         segments: list[ScriptSegment],
@@ -95,7 +148,8 @@ class TimelineCalculator:
         console.print("[cyan]Calculating video timeline...[/cyan]")
         
         timeline_entries = []
-        
+        scene_turn_starts: list[list[float]] = []  # per entry, for assign_scene_times
+
         for i, segment in enumerate(segments):
             # Index-based correspondence: segments[i] <-> segment_timings[i]
             # This correctly handles duplicate segment_ids (e.g., multiple "deep_dive")
@@ -114,9 +168,31 @@ class TimelineCalculator:
                 )
                 timing = self._estimate_timing(segment, i, len(segments), synthesis_result.total_duration_sec)
             
-            # Get background image for this segment
-            bg_image = await image_provider.get_image_for_segment(segment)
-            
+            # Background images: one per scene (a long segment is split at turn starts,
+            # each scene's prompt comes from its own turns; see scene_splitter)
+            scene_starts = self._plan_scene_starts(segment, timing)
+            scene_bounds = scene_starts + [len(segment.turns)]
+            if len(scene_starts) > 1:
+                scene_images = []
+                for k in range(len(scene_starts)):
+                    scene_segment = self._scene_segment(segment, k, scene_bounds[k], scene_bounds[k + 1])
+                    scene_images.append(await image_provider.get_image_for_segment(scene_segment))
+            else:
+                scene_images = [await image_provider.get_image_for_segment(segment)]
+            bg_image = scene_images[0]
+            scenes = [
+                SceneTimelineEntry(
+                    scene_index=k,
+                    start_turn=scene_bounds[k],
+                    end_turn=scene_bounds[k + 1],
+                    video_start_sec=0.0,  # set by assign_scene_times after the cuts are final
+                    video_duration_sec=0.0,
+                    background_image_path=image,
+                )
+                for k, image in enumerate(scene_images)
+            ] if segment.turns else []
+            scene_turn_starts.append(list(getattr(timing, "turn_start_secs", None) or []))
+
             # Get jingle information from SegmentTiming (single source of truth from VoicevoxClient)
             # No random selection here - use what VoicevoxClient already selected
             jingle_path = timing.jingle_path
@@ -157,12 +233,13 @@ class TimelineCalculator:
                 jingle_path=jingle_path,
                 jingle_start_sec=jingle_start,
                 jingle_duration_sec=jingle_duration,
+                scenes=scenes,
             ))
-            
+
             console.print(
                 f"[dim]  Segment {i+1}/{len(segments)}: {segment.segment_id} "
                 f"({timing.start_sec:.1f}s - {timing.end_sec:.1f}s, "
-                f"image: {bg_image.name})[/dim]"
+                f"scenes: {len(scene_images)}, image: {bg_image.name})[/dim]"
             )
         
         # Total duration equals the synthesized audio duration.
@@ -173,7 +250,9 @@ class TimelineCalculator:
         total_duration_with_pauses = synthesis_result.total_duration_sec
 
         align_cuts_to_segment_starts(timeline_entries, segments, total_duration_with_pauses)
-        
+        for entry, turn_starts in zip(timeline_entries, scene_turn_starts):
+            assign_scene_times(entry, turn_starts)
+
         logger.debug(
             f"Timeline duration: audio={synthesis_result.total_duration_sec:.2f}s, "
             f"jingles={jingle_count}, total={total_duration_with_pauses:.2f}s"
@@ -195,7 +274,10 @@ class TimelineCalculator:
             subtitle_path=synthesis_result.subtitle_path,
         )
         
-        console.print(f"[green]✓ Timeline calculated: {len(timeline_entries)} segments[/green]")
+        console.print(
+            f"[green]✓ Timeline calculated: {len(timeline_entries)} segments, "
+            f"{len(timeline.video_scenes())} backgrounds[/green]"
+        )
         
         return timeline
     

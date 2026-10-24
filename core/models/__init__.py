@@ -13,7 +13,7 @@ from .cost_log import CostLogEntry
 from .curation import CuratedTopic, ScriptSegment, CurationResult
 from .fact_sheet import ExtractedFact, FactSheet
 from .fact_check_report import FactCheckIssue, FactCheckReport, FactCheckSeverity
-from .timeline import SegmentTimelineEntry, VideoTimeline
+from .timeline import SceneTimelineEntry, SegmentTimelineEntry, VideoTimeline
 from .execution_context import ExecutionContext
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "FactCheckIssue",
     "FactCheckReport",
     "FactCheckSeverity",
+    "SceneTimelineEntry",
     "SegmentTimelineEntry",
     "VideoTimeline",
     "ExecutionContext",

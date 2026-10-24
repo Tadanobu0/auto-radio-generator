@@ -90,7 +90,13 @@ def calculate_segment_timings(
         
         duration_sec = end_sec - start_sec
         last_end_sec = end_sec
-        
+
+        # Start of every turn in the segment (1 turn = 1 phrase), for scene cuts
+        turn_start_secs = [
+            (phrase_data[k][1] + pre_roll_offset_ms) / 1000.0
+            for k in range(phrase_index, end_phrase_index + 1)
+        ]
+
         segment_timings.append(SegmentTiming(
             segment_id=segment.segment_id,
             segment_type=segment.segment_type,
@@ -100,8 +106,9 @@ def calculate_segment_timings(
             duration_sec=duration_sec,
             jingle_path=jingle_path,
             jingle_duration=jingle_duration,
+            turn_start_secs=turn_start_secs,
         ))
-        
+
         phrase_index += num_turns
     
     return segment_timings
