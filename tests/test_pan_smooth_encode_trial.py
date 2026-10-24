@@ -152,11 +152,13 @@ def test_motion_per_frame_crop_vs_perspective(mock_app_config, tmp_path, out_dir
     # crop: ほとんどのコマで止まり、ときどき 2px 跳ぶ (フィルタの出力の時点で)
     assert raw["crop"]["still"] > 0.9 * raw["crop"]["frames"]
     assert raw["crop"]["max_abs"] >= 0.9
-    # perspective: フィルタの出力では全コマが同じだけ動く
+    # perspective: フィルタの出力では全コマがほぼ同じだけ動く (作業幅 768 の 1/256 画素と 8 bit の
+    # 丸めで ±0.03px ほどぶれる。010 の実測は 0.059〜0.111px、標準偏差 0.007px)
     smooth = raw["perspective"]
     assert smooth["still"] == 0
     assert smooth["mean"] == pytest.approx(expected, rel=0.05)
-    assert smooth["min"] > 0.7 * expected and smooth["max"] < 1.3 * expected
+    assert smooth["std"] < 0.15 * expected
+    assert smooth["min"] > 0.5 * expected and smooth["max"] < 1.5 * expected
     # エンコード後も平均は同じで、1 コマで 0.5px を超えて跳ぶことはない
     assert results["perspective"]["mean"] == pytest.approx(expected, rel=0.05)
     assert results["perspective"]["max_abs"] < 0.5
