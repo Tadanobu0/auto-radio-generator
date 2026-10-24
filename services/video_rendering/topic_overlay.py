@@ -21,15 +21,26 @@ from core.interfaces import ChapterMarker
 from services.audio_synthesis import subtitle_layout as sl
 
 FRAME_WIDTH = 1920
+
+# 右上の日付 (video_track_renderer の drawtext)。Meiryo 28px の「2026/10/24」は約 150px
+DATE_FONT_SIZE = 28
+DATE_MARGIN_X = 20
+DATE_MARGIN_Y = 20
+DATE_MAX_WIDTH_PX = 160
+TITLE_DATE_GAP = 20
+
 TITLE_FONT_SIZES = (80, 72, 64, 56)
 TITLE_MAX_LINES = 2
-TITLE_MARGIN_X = 100
+# 2026-10-24 (010): 横に長い題の帯が右上の日付と重なった (帯は y=40 から、日付は y=20〜60 ほど)。
+# 帯は中央揃えなので、左右とも日付の幅 + 間隔のぶん内側に収める (100 → 200、最大幅 1700 → 1500px)
+TITLE_MARGIN_X = DATE_MARGIN_X + DATE_MAX_WIDTH_PX + TITLE_DATE_GAP
 TITLE_TOP_Y = 50
 TITLE_BOX_BORDER = 10
 TITLE_MAX_WIDTH_PX = FRAME_WIDTH - 2 * (TITLE_MARGIN_X + TITLE_BOX_BORDER)
 
-# 主題と副題の区切り。全角の「：」か、空白が続く半角の「:」(「10:30」は区切りにしない)
-_SUBTITLE_COLON = re.compile(r"：\s*|:\s+")
+# 主題と副題の区切り。全角の「：」か、空白が続く半角の「:」(「10:30」は区切りにしない)。
+# 空白が続く「？」「！」も区切りにする (「電波はどこで弱まる？ 距離・壁・水と金属」)
+_SUBTITLE_COLON = re.compile(r"：\s*|:\s+|[？！?!]\s+")
 _COLONS = "：:"
 
 
@@ -56,7 +67,7 @@ def layout_title(
 ) -> tuple[int, list[str]]:
     """章タイトルを (fontsize, 行の列) にする。文字は落とさない。
 
-    最大の字で 1 行に収まればそのまま。収まらず、題に「：」「: 」があれば、主題と副題が
+    最大の字で 1 行に収まればそのまま。収まらず、題に「：」「: 」「？ 」があれば、主題と副題が
     それぞれ 1 行に収まる最大の字で、そこで 2 行に分ける (「：」は 1 行目の末尾に残す)。
     どちらでもなければ大きい字から順に実測幅で折り返し、TITLE_MAX_LINES 行に収まる最初の
     大きさを使う。最小の大きさでも収まらないときは、行数を増やして全文を出す。

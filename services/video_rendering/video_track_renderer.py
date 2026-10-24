@@ -17,7 +17,7 @@ from rich.console import Console
 
 from core.models import AppConfig, VideoTimeline
 from core.interfaces import ChapterMarker
-from .topic_overlay import build_topic_overlay_filter
+from .topic_overlay import DATE_FONT_SIZE, DATE_MARGIN_X, DATE_MARGIN_Y, build_topic_overlay_filter
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -51,6 +51,80 @@ def build_pan_filter(width: int, height: int, duration_sec: float, pan_ratio: fl
         f"scale={big_w}:{big_h}:force_original_aspect_ratio=increase,"
         f"crop={big_w}:{big_h},"
         f"crop={width}:{height}:x={x}:y={dy // 2},"
+        f"setsar=1"
+    )
+
+
+def smooth_pan_window(
+    width: int,
+    duration_sec: float,
+    scene_index: int,
+    zoom_min: float,
+    zoom_max: float,
+) -> tuple[float, float, float, float]:
+    """(z0, dz, o0, do) of a smooth pan: zoom z = z0 + dz*p, image-centre offset o = o0 + do*p.
+
+    p runs from 0 at the first frame to min(1, duration/full_range_sec) at the last (see
+    build_smooth_pan_filter), so every scene moves at the same speed and only scenes of
+    full_range_sec or longer use the whole range (longer ones move slower). o is how far the
+    image centre sits from the frame centre
+    in output pixels; it travels width*(zoom_min - 1), which keeps the window inside the
+    image at every zoom >= zoom_min. Even scenes zoom in moving right, odd scenes zoom out
+    moving left. Zero-length scenes stay still at (zoom_min, centre).
+    """
+    zoom_min = max(1.0, zoom_min)
+    zoom_max = max(zoom_min, zoom_max)
+    if duration_sec <= 0:
+        return zoom_min, 0.0, 0.0, 0.0
+    half_travel = width * (zoom_min - 1) / 2
+    z_from, z_to, o_from, o_to = zoom_min, zoom_max, -half_travel, half_travel
+    if scene_index % 2 == 1:
+        z_from, z_to, o_from, o_to = z_to, z_from, o_to, o_from
+    return z_from, z_to - z_from, o_from, o_to - o_from
+
+
+def build_smooth_pan_filter(
+    width: int,
+    height: int,
+    duration_sec: float,
+    fps: int,
+    scene_index: int,
+    zoom_min: float,
+    zoom_max: float,
+    full_range_sec: float,
+) -> str:
+    """Filter chain that slowly pans and zooms one still image with sub-pixel steps.
+
+    crop (build_pan_filter) can only move by whole pixels (by 2 on yuv420p), so a slow
+    pan stands still for dozens of frames and then jumps. Here the image is scaled to the
+    frame and perspective (sense=source) maps a moving window of it onto the whole frame,
+    resampling with 1/256-pixel precision every frame. The window is a plain rectangle
+    (zoom + translation only); see smooth_pan_window for the motion. perspective has no
+    time variable, so progress uses the input frame number `in` (1 for the first frame).
+    """
+    z0, dz, o0, do = smooth_pan_window(width, duration_sec, scene_index, zoom_min, zoom_max)
+    half_w = width / 2
+    half_h = height / 2
+    if dz == 0 and do == 0:
+        z, o, eval_mode = f"{z0:.6f}", f"{o0:.4f}", "init"
+    else:
+        frames = fps * max(duration_sec, full_range_sec)
+        p = f"(in-1)/{frames:.1f}"
+        z = f"({z0:.6f}{dz:+.6f}*{p})"
+        o = f"({o0:.4f}{do:+.4f}*{p})"
+        eval_mode = "frame"
+    # Window in the frame-sized image: output x = (image x - left) * z, image centre at half_w + o
+    left = f"{half_w:g}-({o}+{half_w:g})/{z}"
+    right = f"{half_w:g}-({o}-{half_w:g})/{z}"
+    top = f"{half_h:g}-{half_h:g}/{z}"
+    bottom = f"{half_h:g}+{half_h:g}/{z}"
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+        f"crop={width}:{height},"
+        f"format=yuv420p,"
+        f"perspective=x0={left}:y0={top}:x1={right}:y1={top}:"
+        f"x2={left}:y2={bottom}:x3={right}:y3={bottom}:"
+        f"interpolation=linear:sense=source:eval={eval_mode},"
         f"setsar=1"
     )
 
@@ -110,7 +184,7 @@ class VideoTrackRenderer:
         # Debug output
         console.print(
             f"[dim]Video track: {len(timeline.segments)} segments, "
-            f"{len(timeline.video_scenes())} backgrounds (pan: {self._pan_ratio():.0%})[/dim]"
+            f"{len(timeline.video_scenes())} backgrounds (pan: {self._pan_method() or 'off'})[/dim]"
         )
         
         # Execute FFmpeg
@@ -207,12 +281,21 @@ class VideoTrackRenderer:
         """
         scenes = timeline.video_scenes()
         n = len(scenes)
+        pan_method = self._pan_method()
         pan_ratio = self._pan_ratio()
+        vc = self.video_config
 
         # Scale each input to target resolution (and pan it when enabled)
         scale_filters = []
         for i, (_image, duration_sec) in enumerate(scenes):
-            if pan_ratio > 0:
+            if pan_method == "perspective":
+                chain = build_smooth_pan_filter(
+                    int(width), int(height), duration_sec, timeline.fps, i,
+                    float(getattr(vc, "pan_zoom_min", 1.12)),
+                    float(getattr(vc, "pan_zoom_max", 1.22)),
+                    float(getattr(vc, "pan_full_range_sec", 90.0)),
+                )
+            elif pan_method == "crop" and pan_ratio > 0:
                 chain = build_pan_filter(int(width), int(height), duration_sec, pan_ratio, i)
             else:
                 chain = f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
@@ -224,8 +307,18 @@ class VideoTrackRenderer:
 
         return ";".join(scale_filters) + ";" + concat_filter
 
+    def _pan_method(self) -> str:
+        """"perspective" (smooth, default), "crop" (009, whole-pixel steps) or "" (no pan)."""
+        if not getattr(self.video_config, "enable_pan", False):
+            return ""
+        method = str(getattr(self.video_config, "pan_method", "perspective")).strip().lower()
+        if method not in ("perspective", "crop"):
+            logger.warning(f"Unknown pan_method {method!r}; using perspective")
+            return "perspective"
+        return method
+
     def _pan_ratio(self) -> float:
-        """Share of the screen width a scene moves over its length (0 = no pan)."""
+        """crop method: share of the screen width a scene moves over its length (0 = no pan)."""
         if not getattr(self.video_config, "enable_pan", False):
             return 0.0
         return max(0.0, float(getattr(self.video_config, "pan_ratio", 0.05)))
@@ -293,12 +386,13 @@ class VideoTrackRenderer:
         """
         creation_date = datetime.now().strftime("%Y/%m/%d")
         fontfile = self._get_drawtext_fontfile()
-        
+
+        # Position/size shared with topic_overlay, which keeps the title band clear of it
         return (
             f"drawtext=text='{creation_date}':"
             f"fontfile='{fontfile}':"
-            f"fontsize=28:fontcolor=white@0.7:"
-            f"x=w-tw-20:y=20:"
+            f"fontsize={DATE_FONT_SIZE}:fontcolor=white@0.7:"
+            f"x=w-tw-{DATE_MARGIN_X}:y={DATE_MARGIN_Y}:"
             f"shadowcolor=black@0.5:shadowx=2:shadowy=2"
         )
     

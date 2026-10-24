@@ -335,7 +335,8 @@ def test_render_inputs_are_scenes(mock_app_config):
 
 
 def test_render_filter_pans_each_scene(mock_app_config):
-    cmd = _command(mock_app_config)
+    # 010 で既定が perspective になったので、009 の crop 方式を明示する
+    cmd = _command(mock_app_config, pan_method="crop")
     fc = cmd[cmd.index("-filter_complex") + 1]
     assert "[0:v]scale=2016:1134" in fc and "x=96*t/90.000" in fc
     assert "[1:v]scale=2016:1134" in fc and "x=96-96*t/90.000" in fc

@@ -435,8 +435,18 @@ class VideoRendererConfig(BaseModel):
     # 章の中の場面分割(1 章を約 scene_target_sec ごとに 1 枚、1〜max_scenes_per_chapter 枚)
     scene_target_sec: float = 90.0
     max_scenes_per_chapter: int = 4
-    # 各場面の背景をゆっくり平行移動させる(場面の長さで画面幅の pan_ratio だけ動く)
+    # 各場面の背景をゆっくり動かす
     enable_pan: bool = True
+    # "perspective": 小数ピクセルで滑らかに動かす(平行移動 + ゆっくりズーム、010)
+    # "crop": 009 の方式(1.05 倍に拡大して crop の x を動かす。整数ピクセル単位でカクつく)
+    pan_method: str = "perspective"
+    # perspective: ズームを pan_zoom_min ⇔ pan_zoom_max で動かし、画面中央の点を画面幅の
+    # (pan_zoom_min - 1) だけ平行移動させる。pan_full_range_sec より短い場面は同じ速さで途中まで、
+    # 長い場面は全体をゆっくり動く
+    pan_zoom_min: float = 1.12
+    pan_zoom_max: float = 1.22
+    pan_full_range_sec: float = 90.0
+    # crop: 場面の長さで画面幅の pan_ratio だけ動く
     pan_ratio: float = 0.05
     # 映像トラック(Phase B)を NVENC でエンコードするか。use_gpu は 1 枚画像モードだけに効き、
     # 映像トラックは既定で libx264 ultrafast のまま(009 の試しエンコードを見て PM が決める)

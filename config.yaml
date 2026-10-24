@@ -549,8 +549,17 @@ video_renderer:
   # 場面ごとの背景(章を約 90 秒ごとに分け、1 章 1〜4 枚。章タイトル・チャプターは章単位のまま)
   scene_target_sec: 90.0
   max_scenes_per_chapter: 4       # 1 にすると従来どおり章 1 枚
-  # 背景のパン(ゆっくり平行移動。場面の長さで画面幅の pan_ratio だけ動く。ズームはしない)
+  # 背景のパン
   enable_pan: true
+  # perspective: 小数ピクセルで滑らかに動かす(平行移動 + ゆっくりズーム)
+  # crop: 009 の方式(1.05 倍・平行移動だけ。整数ピクセル単位で動くのでカクつく)
+  pan_method: "perspective"
+  # perspective: ズームを 1.12 ⇔ 1.22 倍で動かし、画面中央の点を画面幅の 12%(1080p で 230px)動かす。
+  # pan_full_range_sec(90 秒)で全部動く速さ。短い場面は同じ速さで途中まで、長い場面はゆっくり全部
+  pan_zoom_min: 1.12
+  pan_zoom_max: 1.22
+  pan_full_range_sec: 90.0
+  # crop: 場面の長さで画面幅の pan_ratio だけ動く
   pan_ratio: 0.05
   # 映像トラックを NVENC でエンコードする(false: libx264 ultrafast)。use_gpu とは別
   video_track_use_gpu: false
