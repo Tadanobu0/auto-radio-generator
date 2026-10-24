@@ -3,7 +3,7 @@
 2026-10-24 (Wi-Fi の回): 横に長い題 (「電波はどこで弱まる？ 距離・壁・水と金属」
 「まとめ: 仕組みを知れば置き場所は変えられる」) の帯が、右上の日付 (2026/10/24) と少し
 重なっていた。帯は y=40 から、日付は y=20 から描かれ、帯の最大幅 1700px だと右端が
-x=1820 まで来る。帯の最大幅を日付の幅 + 間隔のぶん左右とも狭めた (1500px)。
+x=1820 まで来る。帯の最大幅を日付の幅 + 間隔のぶん左右とも狭めた (1480px)。
 
 ffmpeg を呼ぶテストは、ffmpeg と Meiryo のある環境 (Windows 実機) だけで動く。
 """
@@ -30,7 +30,7 @@ def _box_right_edge(title: str) -> float:
 
 
 def test_title_max_width_leaves_room_for_the_date():
-    assert to.TITLE_MAX_WIDTH_PX == 1500
+    assert to.TITLE_MAX_WIDTH_PX == 1480
     date_left = to.FRAME_WIDTH - to.DATE_MARGIN_X - to.DATE_MAX_WIDTH_PX
     assert to.FRAME_WIDTH / 2 + to.TITLE_MAX_WIDTH_PX / 2 + to.TITLE_BOX_BORDER <= date_left - to.TITLE_DATE_GAP
 

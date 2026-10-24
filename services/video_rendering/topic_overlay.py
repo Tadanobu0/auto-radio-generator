@@ -22,17 +22,17 @@ from services.audio_synthesis import subtitle_layout as sl
 
 FRAME_WIDTH = 1920
 
-# 右上の日付 (video_track_renderer の drawtext)。Meiryo 28px の「2026/10/24」は約 150px
+# 右上の日付 (video_track_renderer の drawtext)。Meiryo 28px の「2026/10/24」は 162px (Windows で実測)
 DATE_FONT_SIZE = 28
 DATE_MARGIN_X = 20
 DATE_MARGIN_Y = 20
-DATE_MAX_WIDTH_PX = 160
+DATE_MAX_WIDTH_PX = 170
 TITLE_DATE_GAP = 20
 
 TITLE_FONT_SIZES = (80, 72, 64, 56)
 TITLE_MAX_LINES = 2
 # 2026-10-24 (010): 横に長い題の帯が右上の日付と重なった (帯は y=40 から、日付は y=20〜60 ほど)。
-# 帯は中央揃えなので、左右とも日付の幅 + 間隔のぶん内側に収める (100 → 200、最大幅 1700 → 1500px)
+# 帯は中央揃えなので、左右とも日付の幅 + 間隔のぶん内側に収める (100 → 210、最大幅 1700 → 1480px)
 TITLE_MARGIN_X = DATE_MARGIN_X + DATE_MAX_WIDTH_PX + TITLE_DATE_GAP
 TITLE_TOP_Y = 50
 TITLE_BOX_BORDER = 10
