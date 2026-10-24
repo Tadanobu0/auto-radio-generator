@@ -5,10 +5,12 @@ This is Phase A of the 3-phase rendering pipeline.
 """
 import logging
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 
 from core.models import AppConfig, SceneTimelineEntry, ScriptSegment, SegmentTimelineEntry, VideoTimeline
+from core.models.curation import SceneVisual
 from core.interfaces import SynthesisResult, SegmentTiming
 from services.media_processing import ImageProvider, JingleProvider
 from .scene_splitter import split_scene_starts
@@ -114,15 +116,41 @@ class TimelineCalculator:
         )
 
     @staticmethod
-    def _scene_segment(segment: ScriptSegment, scene_index: int, start_turn: int, end_turn: int) -> ScriptSegment:
+    def _usable_visuals(segment: ScriptSegment, timing: SegmentTiming) -> Optional[list[SceneVisual]]:
+        """The script's own scenes (segment.visuals), or None to use scene_splitter.
+
+        The loader has already checked the visuals; here they also need a start time
+        for every turn (the scene times come from turn_start_secs, as with the splitter).
+        """
+        if not segment.visuals:
+            return None
+        turn_starts = list(getattr(timing, "turn_start_secs", None) or [])
+        if not segment.turns or len(turn_starts) != len(segment.turns):
+            logger.warning(
+                f"visuals of {segment.segment_id} ignored: {len(turn_starts)} turn start times "
+                f"for {len(segment.turns)} turns; falling back to scene_splitter"
+            )
+            return None
+        return segment.visuals
+
+    @staticmethod
+    def _scene_segment(
+        segment: ScriptSegment,
+        scene_index: int,
+        start_turn: int,
+        end_turn: int,
+        visual: Optional[SceneVisual] = None,
+    ) -> ScriptSegment:
         """The segment narrowed to one scene's turns (for that scene's image prompt).
 
         Topic, type and key claims stay the same, so the prompt keeps the chapter's
         subject while the excerpt (and so the pictured object) comes from the scene.
+        visual (the script's SceneVisual, if any) tells the prompt what to draw.
         """
         return segment.model_copy(update={
             "segment_id": f"{segment.segment_id}_scene{scene_index + 1}",
             "turns": segment.turns[start_turn:end_turn],
+            "scene_visual": visual,
         })
 
     async def calculate_timeline(
@@ -169,14 +197,26 @@ class TimelineCalculator:
                 timing = self._estimate_timing(segment, i, len(segments), synthesis_result.total_duration_sec)
             
             # Background images: one per scene (a long segment is split at turn starts,
-            # each scene's prompt comes from its own turns; see scene_splitter)
-            scene_starts = self._plan_scene_starts(segment, timing)
+            # each scene's prompt comes from its own turns; see scene_splitter).
+            # When the script gives visuals, its start_turns are the cuts and each scene's
+            # prompt also gets that scene's SceneVisual (what to draw / not to draw).
+            visuals = self._usable_visuals(segment, timing)
+            if visuals:
+                scene_starts = [visual.start_turn for visual in visuals]
+            else:
+                scene_starts = self._plan_scene_starts(segment, timing)
             scene_bounds = scene_starts + [len(segment.turns)]
             if len(scene_starts) > 1:
                 scene_images = []
                 for k in range(len(scene_starts)):
-                    scene_segment = self._scene_segment(segment, k, scene_bounds[k], scene_bounds[k + 1])
+                    scene_segment = self._scene_segment(
+                        segment, k, scene_bounds[k], scene_bounds[k + 1],
+                        visuals[k] if visuals else None,
+                    )
                     scene_images.append(await image_provider.get_image_for_segment(scene_segment))
+            elif visuals:
+                scene_segment = segment.model_copy(update={"scene_visual": visuals[0]})
+                scene_images = [await image_provider.get_image_for_segment(scene_segment)]
             else:
                 scene_images = [await image_provider.get_image_for_segment(segment)]
             bg_image = scene_images[0]

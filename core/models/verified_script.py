@@ -9,6 +9,10 @@ VerifiedScript JSON を Windows 側 auto-radio-generator が読み込むため�
 場合、`tests/fixtures/verified_script_sample.json` を Mac 側 fixture から再取得して
 配置し直し、本モデルの定義も合わせて更新する。
 
+## 例外: segments[].visuals (spec v1.11.0 §12)
+不正な visuals は ValidationError にせず、その章だけ従来の場面分割に戻す (仕様)。
+そのため `Segment.visuals` は形を問わず受け、loader で章ごとに検査する。
+
 ## 設計方針
 - 読み取り用 view モデル: Windows 側では VerifiedScript を**生成しない**ため、
   生成側のロジックや retry / sanitize は持たない
@@ -65,6 +69,13 @@ class Segment(BaseModel):
     )
     title: str = Field(..., min_length=1, description="セグメントタイトル (chapter 表示等で使用)")
     turns: List[Turn] = Field(..., min_length=1, description="ターンリスト (最低 1 件)")
+    # spec v1.11.0 §12: 場面ごとに何を描くか (SceneVisual のリスト、任意)。
+    # 不正でもファイル全体は拒否せず、その章だけ scene_splitter に戻す仕様なので、
+    # ここでは形を問わず受け、loader (build_script_segments) で章ごとに検査する。
+    visuals: Optional[Any] = Field(
+        default=None,
+        description="場面の指定 (SceneVisual のリスト)。検査は loader で行う",
+    )
 
 
 class KeyClaim(BaseModel):
