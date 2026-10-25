@@ -37,9 +37,12 @@ class ImagePromptGenerator:
     # constraint sits at the head of the prompt instead of relying on the LLM to end with it.
     # Kept short and led by positive wording ("unpopulated, wordless"): FLUX reads negated nouns
     # as nouns, so every "no X" risks inviting X (e.g. "screen" was dropped for that reason).
+    # The device-surface clause (015) was added after garbled logo-like words appeared on a
+    # router's front panel despite "no text, signage or labels".
     SEGMENT_PROMPT_PREFIX = (
         "An unpopulated, wordless scene with no people, no hands, no faces, "
-        "no text, signage or labels: "
+        "no text, signage or labels, "
+        "plain unbranded device surfaces with no logos, model names or printed characters: "
     )
 
     # Upper bound for the script excerpt handed to the LLM (same budget as the former
@@ -415,6 +418,7 @@ Generate the prompt now:"""
 - Keep the same main objects and the same number of units, written as an English word (one, two, three ...)
 - Keep every placement, height and position word as words about the place (e.g. 腰の高さの棚 -> on a waist-height shelf). A height word says where the object stands, never how big it is
 - Describe only what is in the picture. No people and no writing; do not name anything that must not be shown, not even negated
+- Add no symbol or graphic that the direction does not name (glowing lines or arcs, waves, arrows, Wi-Fi marks)
 - Return only the sentence, under 60 words, with no Japanese and no quotation marks"""
 
     async def _short_scene_prompt(
@@ -539,7 +543,8 @@ Generate the prompt now:"""
         steps += [
             f"{len(steps) + 1}. Use the excerpts only for details that agree with the scene direction; when they differ, follow the scene direction",
             f"{len(steps) + 2}. State the hero's size, material, where it is placed, and its frame share; then add light, composition, and the unified visual brand (colors, aesthetic, film quality)",
-            f"{len(steps) + 3}. Keep the scene unpopulated and wordless, describing only what is in it; never copy names from the script",
+            f"{len(steps) + 3}. Keep the scene unpopulated and wordless, describing only what is in it; never copy names from the script. "
+            "Add no symbol or graphic that \"Draw\" does not name - no glowing lines or arcs, waves, arrows, or Wi-Fi marks",
         ]
         instructions = "\n".join(steps)
 
