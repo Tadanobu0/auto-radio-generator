@@ -16,6 +16,7 @@ from core.models.visual import (
     DEFAULT_AESTHETIC,
 )
 from services.script_generation.adapters.factory import LLMAdapterFactory
+from services.script_generation.scene_placement_check import find_placement_problem
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -194,6 +195,8 @@ Example 3 (Environmental Topic):
             config: Application configuration
         """
         self.config = config
+        # Prompts replaced by a fallback (chapter, scene, reason), for result.json (014)
+        self.warnings: list[str] = []
 
         # Step 5 (2026-05-10): Gemini → Mac Studio Proxy (vLLM Qwen3 系)。
         # orchestrator.curator_model を再利用 (ThumbnailGenerator.regenerate_with_new_title
@@ -268,7 +271,36 @@ Generate the prompt now:"""
         
         logger.info(f"Generating prompt for segment: {segment.segment_id}")
         console.print(f"[cyan]Generating image prompt for {segment.segment_id}...[/cyan]")
-        
+
+        if segment.scene_visual:
+            return await self._generate_scene_visual_prompt(
+                segment, identity, system_prompt, user_message, color_palette, aesthetic
+            )
+
+        body, reason, _ = await self._ask_llm(segment, system_prompt, user_message)
+        if body is not None:
+            return self._accept(body)
+
+        # Fallback to generic prompt (scenes without a scene direction only)
+        self._add_fallback_warning(segment, [reason], "used the generic fallback prompt")
+        console.print(f"[yellow]Using fallback prompt[/yellow]")
+        return self._get_fallback_prompt(segment, identity)
+
+    def _accept(self, body: str) -> str:
+        """Final prompt from an accepted LLM body (no-people / no-text constraint at the head)."""
+        prompt = self.SEGMENT_PROMPT_PREFIX + body
+        logger.info(f"Generated prompt: {prompt[:100]}...")
+        console.print(f"[dim]Prompt: {prompt[:80]}...[/dim]")
+        return prompt
+
+    async def _ask_llm(
+        self, segment: ScriptSegment, system_prompt: str, user_message: str
+    ) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """One LLM call for the prompt body.
+
+        Returns (body, None, None) when usable, else (None, reason, rejected_body); the
+        rejected body is kept only for an over-long output (it is still about the scene).
+        """
         try:
             llm_request = LLMRequest(
                 system_prompt=system_prompt,
@@ -279,36 +311,173 @@ Generate the prompt now:"""
                 response_format="text",
             )
             llm_response = await self._llm_port.generate(llm_request)
-            body = llm_response.content.strip().strip('"\'').strip()
-            if not body:
-                raise ValueError("LLM returned an empty image prompt")
-
-            # Put the no-people / no-text constraint at the head of the prompt
-            prompt = self.SEGMENT_PROMPT_PREFIX + body
-
-            if len(prompt) > self.MAX_SEGMENT_PROMPT_CHARS:
-                # Runaway output: use the fixed fallback rather than a truncated prompt
-                logger.warning(
-                    f"Generated prompt too long for {segment.segment_id}: "
-                    f"{len(prompt)} chars > {self.MAX_SEGMENT_PROMPT_CHARS}, using fallback prompt"
-                )
-                console.print(f"[yellow]⚠ Prompt too long ({len(prompt)} chars), using fallback prompt[/yellow]")
-                return self._get_fallback_prompt(segment, identity)
-
-            logger.info(f"Generated prompt: {prompt[:100]}...")
-            console.print(f"[dim]Prompt: {prompt[:80]}...[/dim]")
-
-            return prompt
-
+            body = (llm_response.content or "").strip().strip('"\'').strip()
         except Exception as e:
-            logger.error(f"Prompt generation failed: {e}")
+            logger.error(f"Prompt generation failed for {segment.segment_id}: {e}")
             console.print(f"[red]✗ Prompt generation failed: {e}[/red]")
+            return None, f"LLM call failed ({type(e).__name__}: {self._short(e)})", None
 
-            # Fallback to generic prompt
-            fallback = self._get_fallback_prompt(segment, identity)
-            console.print(f"[yellow]Using fallback prompt[/yellow]")
-            return fallback
-    
+        if not body:
+            logger.error(f"Prompt generation failed for {segment.segment_id}: LLM returned an empty image prompt")
+            console.print(f"[red]✗ Prompt generation failed: empty output[/red]")
+            return None, "LLM returned an empty prompt", None
+
+        length = len(self.SEGMENT_PROMPT_PREFIX + body)
+        if length > self.MAX_SEGMENT_PROMPT_CHARS:
+            # Runaway output: never sent truncated as is
+            logger.warning(
+                f"Generated prompt too long for {segment.segment_id}: "
+                f"{length} chars > {self.MAX_SEGMENT_PROMPT_CHARS}"
+            )
+            console.print(f"[yellow]⚠ Prompt too long ({length} chars)[/yellow]")
+            return None, f"LLM output too long ({length} chars > {self.MAX_SEGMENT_PROMPT_CHARS})", body
+
+        return body, None, None
+
+    async def _generate_scene_visual_prompt(
+        self,
+        segment: ScriptSegment,
+        identity: Optional[VisualIdentity],
+        system_prompt: str,
+        user_message: str,
+        color_palette: str,
+        aesthetic: str,
+    ) -> str:
+        """Prompt for a scene with a SceneVisual; never the generic scene while the LLM answers (014).
+
+        1. Full prompt; if it fails (error, empty, too long, placement check), ask once more,
+           telling the LLM what was wrong.
+        2. Still failing: a short English prompt translated from focus / draw.
+        3. LLM unusable even for that: the rejected full prompt (placement-failing one as is,
+           an over-long one cut at a comma), and only if there is none, the generic prompt.
+        Every fallback is put in self.warnings with the chapter, scene and reasons.
+        """
+        visual = segment.scene_visual
+        reasons: list[str] = []
+        rejected: list[tuple[str, str]] = []  # (kind, body): kind is "placement" or "long"
+        message = user_message
+        for attempt in range(2):
+            body, reason, long_body = await self._ask_llm(segment, system_prompt, message)
+            if body is not None:
+                problem = find_placement_problem(visual.draw, visual.avoid, body)
+                if problem is None:
+                    if reasons:
+                        logger.warning(
+                            f"Image prompt for {segment.segment_id} accepted on retry after: {'; '.join(reasons)}"
+                        )
+                    return self._accept(body)
+                reason = f"placement check failed ({problem})"
+                logger.warning(f"Image prompt for {segment.segment_id}: {reason}")
+                rejected.append(("placement", body))
+            elif long_body is not None:
+                rejected.append(("long", long_body))
+            reasons.append(f"try {attempt + 1}: {reason}")
+            message = user_message + self._retry_note(reason)
+
+        short, short_reason = await self._short_scene_prompt(segment, color_palette, aesthetic)
+        if short is not None:
+            outcome = "used a short prompt built from focus/draw"
+            problem = find_placement_problem(visual.draw, visual.avoid, short)
+            if problem:
+                outcome += f" (its placement check also failed: {problem})"
+            self._add_fallback_warning(segment, reasons, outcome)
+            return short
+        reasons.append(f"short prompt from focus/draw: {short_reason}")
+
+        for kind, body in sorted(rejected, key=lambda item: item[0] != "placement"):
+            if kind == "placement":
+                self._add_fallback_warning(segment, reasons, "used the rejected prompt as is")
+                return self._accept(body)
+            cut = self._cut_at_comma(body)
+            if cut:
+                self._add_fallback_warning(segment, reasons, "used the over-long prompt cut at a comma")
+                return self._accept(cut)
+
+        self._add_fallback_warning(segment, reasons, "used the generic fallback prompt (no usable LLM output)")
+        return self._get_fallback_prompt(segment, identity)
+
+    @staticmethod
+    def _retry_note(reason: str) -> str:
+        """Extra block for the retry, saying what was wrong with the first prompt."""
+        if reason.startswith("placement check failed"):
+            detail = (
+                f"Your previous prompt was rejected: {reason}. Write the place exactly as \"Draw\" "
+                "gives it, as words about the furniture or spot (e.g. 腰の高さの棚 -> on a waist-height "
+                "shelf), and keep the hero off the floor and off low furniture."
+            )
+        elif reason.startswith("LLM output too long"):
+            detail = f"Your previous prompt was rejected: {reason}. Keep it to ONE paragraph of 60-110 words."
+        else:
+            return ""
+        return f"\n\nCORRECTION:\n{detail}"
+
+    SHORT_SCENE_SYSTEM_PROMPT = """You turn a Japanese scene direction for a background picture into ONE plain English sentence that describes only what is in the picture.
+- Keep the same main objects and the same number of units, written as an English word (one, two, three ...)
+- Keep every placement, height and position word as words about the place (e.g. 腰の高さの棚 -> on a waist-height shelf). A height word says where the object stands, never how big it is
+- Describe only what is in the picture. No people and no writing; do not name anything that must not be shown, not even negated
+- Return only the sentence, under 60 words, with no Japanese and no quotation marks"""
+
+    async def _short_scene_prompt(
+        self, segment: ScriptSegment, color_palette: str, aesthetic: str
+    ) -> tuple[Optional[str], Optional[str]]:
+        """(prompt, None) from a plain translation of focus / draw, or (None, reason)."""
+        visual = segment.scene_visual
+        lines = [f"Point of this scene: {visual.focus}", f"Draw: {visual.draw}"]
+        avoid = "; ".join(item.strip() for item in visual.avoid if item.strip())
+        if avoid:
+            lines.append(f"Must not be shown (draw the correct opposite instead, without naming it): {avoid}")
+        try:
+            response = await self._llm_port.generate(LLMRequest(
+                system_prompt=self.SHORT_SCENE_SYSTEM_PROMPT,
+                user_prompt="\n".join(lines),
+                model=self.model_name,
+                max_tokens=160,
+                temperature=0.2,
+                response_format="text",
+            ))
+            sentence = self._sanitize_prompt((response.content or "").strip().strip('"\'').strip())
+        except Exception as e:
+            logger.error(f"Short scene prompt failed for {segment.segment_id}: {e}")
+            return None, f"LLM call failed ({type(e).__name__}: {self._short(e)})"
+        sentence = sentence.rstrip(" .")
+        if not sentence:
+            return None, "LLM returned an empty sentence"
+        prompt = (
+            f"{self.SEGMENT_PROMPT_PREFIX}{sentence}, bathed in {color_palette}, {aesthetic}, "
+            f"shot on Kodak Portra 400 film, subtle film grain, highly detailed"
+        )
+        if len(prompt) > self.MAX_SEGMENT_PROMPT_CHARS:
+            return None, f"sentence too long ({len(prompt)} chars > {self.MAX_SEGMENT_PROMPT_CHARS})"
+        logger.info(f"Short scene prompt for {segment.segment_id}: {prompt[:100]}...")
+        return prompt, None
+
+    def _cut_at_comma(self, body: str) -> Optional[str]:
+        """Longest head of body ending before a comma that fits MAX_SEGMENT_PROMPT_CHARS."""
+        room = self.MAX_SEGMENT_PROMPT_CHARS - len(self.SEGMENT_PROMPT_PREFIX)
+        head = body[:room]
+        cut = head.rfind(",")
+        if cut < room // 2:
+            return None
+        return head[:cut].rstrip()
+
+    @staticmethod
+    def _short(error: Exception, limit: int = 160) -> str:
+        text = " ".join(str(error).split())
+        return text if len(text) <= limit else text[:limit - 1] + "…"
+
+    def _add_fallback_warning(self, segment: ScriptSegment, reasons: list[str], outcome: str) -> None:
+        """Keep a fallback in self.warnings (for result.json) with the chapter and scene."""
+        match = re.match(r"^(.*)_scene(\d+)$", segment.segment_id)
+        chapter, scene = (match.group(1), int(match.group(2))) if match else (segment.segment_id, 1)
+        message = (
+            f"image prompt for {chapter} scene {scene} ({segment.segment_id}) fell back: "
+            f"{'; '.join(r for r in reasons if r)}; {outcome}"
+        )
+        logger.warning(message)
+        if not isinstance(getattr(self, "warnings", None), list):
+            self.warnings = []
+        self.warnings.append(message)
+
     def _build_segment_context(self, segment: ScriptSegment) -> str:
         """Build rich context string from segment for subject-driven prompt generation
         
@@ -353,7 +522,11 @@ Generate the prompt now:"""
         direction_text = "\n".join(direction)
 
         steps = [
-            "1. Make the hero exactly what \"Draw\" says: the same main objects, in the same NUMBER of units, in the same place",
+            "1. Make the hero exactly what \"Draw\" says: the same main objects, in the same NUMBER of units, in the same place. "
+            "Carry every placement, height and position word of \"Draw\" into English as words about the furniture or spot "
+            "(e.g. 腰の高さの棚 -> on a waist-height shelf; 部屋の中央寄り -> toward the middle of the room). A height word "
+            "tells where the object stands, never how big it is: describe the object's own size with other words "
+            "(palm-sized, book-sized), and never turn a raised place into a low one or the floor",
             "2. If \"Draw\" names more than one unit, write the count as an English word (two, three ...) and show every unit clearly in the frame; together they fill 40-60 percent of the frame. This count is the one figure you must write",
         ]
         if avoid:

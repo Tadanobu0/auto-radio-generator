@@ -1,5 +1,14 @@
 # STATUS
 
+## visuals からのプロンプト作りの取りこぼしを直す(ブリーフ 014)— 2026-10-25 時点
+- ブランチ `pm/014` に実装済み。main へは未マージ(PM が報告を見てから merge)
+- deep_dive_2_scene1 が汎用の文になった原因(コードからの見立て): LLM の出力が 1000 字を超え、固定の汎用の文に替わった。約 18.6 秒かかったのは、出力が上限(512 トークン)近くまで伸びたためとみられる。失敗の記録は Python の logging だけで、processing_log.txt にも warnings にも出なかった。Windows の run のログ・prompt_report.md・generation_metadata.jsonl はこのジョブから読めず、未確認
+- 汎用の文・既定の文(静止画)に替えたときは `WorkflowResult.warnings` に章・場面・理由が入る(処理ログにも `[WARN]`)。例: `image prompt for deep_dive_2 scene 1 (deep_dive_2_scene1) fell back: try 1: LLM output too long (1234 chars > 1000); try 2: …; used a short prompt built from focus/draw`
+- scene_visual がある場面: 失敗(例外・空・長すぎ・置き場所のチェック)したら、何が悪かったかを添えて 1 回作り直す → だめなら LLM に focus・draw を 1 文の英語に訳させる → それも答えなければ、退けた出力を使う。汎用の文は LLM がまったく答えないときだけ。visuals の無い場面は従来どおり(作り直さず汎用の文)、warnings だけ足した
+- 置き場所のチェック(`services/script_generation/scene_placement_check.py`): draw に高さの語(腰の高さ等)や床から離す語がある、または avoid が床置きを避けるのに、プロンプトに `on the floor` / `low shelf` 等がある → 作り直し。高さの語が家具に付かず機器に付いている(`waist-high white router`)→ 作り直し
+- 指示: step 1 に「draw の置き場所・高さ・位置の語を家具の言葉として英語に残す(腰の高さの棚 → on a waist-height shelf)。高さの語は大きさではない」を足した(番号の数は変えていない)
+- arg-remote `test -q`: 830 passed / 8 skipped(skip は試しエンコード)
+
 ## visuals の avoid の型を仕様に合わせ、警告と画像プロンプトの記録を Mac に返す(ブリーフ 013)— 2026-10-25 時点
 - ブランチ `pm/013` に実装済み。main へは未マージ(PM が報告を見てから merge)
 - 019 の回で絵が 2 枚のままだった原因(コードからの見立て): `SceneVisual.avoid` が strict な「str か null」で、List[str] の avoid が各章の scene 0 で型エラーになり、3 章とも scene_splitter に戻った。場面数(3・4)は上限 4 以内で、`max_scenes_per_chapter` は visuals の章では見ない。Windows のログ・prompt_report.md はこのジョブから読めず、未確認
