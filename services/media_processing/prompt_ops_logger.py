@@ -143,7 +143,23 @@ class PromptOpsLogger:
         
         if metadata.segment_id:
             lines.append(f"**Segment**: `{metadata.segment_id}` (type: {metadata.segment_type})")
-        
+
+        # Scene direction from the script's visuals (013); "scene_splitter" when there was none
+        scene_visual = getattr(metadata, "scene_visual", None)
+        if metadata.context_type == "segment":
+            if scene_visual:
+                avoid = scene_visual.get("avoid") or []
+                lines.extend([
+                    f"**Scene source**: visuals (start_turn {scene_visual.get('start_turn')})  ",
+                    f"**Focus**: {scene_visual.get('focus', '')}  ",
+                    f"**Draw**: {scene_visual.get('draw', '')}  ",
+                    f"**Avoid**: {'; '.join(avoid) if avoid else '(none)'}  ",
+                ])
+            else:
+                lines.append("**Scene source**: scene_splitter  ")
+        if getattr(metadata, "cached", False):
+            lines.append("**Cached**: yes (image reused from output/.image_cache)  ")
+
         lines.extend([
             f"**Visual Identity**: {vi_summary}  ",
             f"**Seed**: {metadata.seed}  ",

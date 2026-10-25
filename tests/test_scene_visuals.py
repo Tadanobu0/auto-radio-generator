@@ -358,10 +358,11 @@ def test_invalid_visuals_fall_back_only_for_that_segment(mock_app_config, caplog
 
 
 def test_parse_accepts_four_scenes_and_missing_or_null_avoid():
+    # 013: avoid は仕様 (§12) どおり List[str]。str は要素 1 つ、欄なし・null は空リストになる
     raw = [_visual(0), _visual(2, avoid="床置き"), {**_visual(4), "avoid": None}, _visual(7)]
     visuals = parse_scene_visuals(raw, 8, "deep_dive_1")
     assert [v.start_turn for v in visuals] == [0, 2, 4, 7]
-    assert [v.avoid for v in visuals] == [None, "床置き", None, None]
+    assert [v.avoid for v in visuals] == [[], ["床置き"], [], []]
 
 
 def test_parse_returns_none_for_none_without_warning(caplog):

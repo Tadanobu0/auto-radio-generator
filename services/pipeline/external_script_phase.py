@@ -29,6 +29,7 @@ from core.session_manager import SessionManager
 from services.script_loading.radio_director_loader import (
     RadioDirectorScriptLoader,
     build_script_segments,
+    collect_visuals_warnings,
 )
 from services.script_generation.visual_palette_generator import VisualPaletteGenerator
 
@@ -51,6 +52,8 @@ class ExternalScriptPhaseResult:
     visual_identity: Optional[VisualIdentity] = None
     # 元の VerifiedScript も保持（HITL / debug / 再実行で参照可能にする）
     verified_script: Optional[VerifiedScript] = field(default=None, repr=False)
+    # 読み込み時の警告（不正な visuals を捨てた章など）。result.json の warnings に載せる（013）
+    warnings: List[str] = field(default_factory=list)
 
 
 async def execute_external_script_phase(
@@ -91,6 +94,10 @@ async def execute_external_script_phase(
 
     # 3. ScriptSegment を構築 (production_phase の chapter rendering で使用)
     segments = build_script_segments(vs)
+    # 不正な visuals は章ごとに捨てて scene_splitter に戻す。その警告を処理ログにも残す
+    warnings = collect_visuals_warnings(segments)
+    for message in warnings:
+        log(f"[WARN] {message}")
 
     # 4. 事前構築メタデータ (Phase 4 で Gemini packaging prompt を bypass するため)
     pre_built_metadata: Dict[str, Any] = {
@@ -145,4 +152,5 @@ async def execute_external_script_phase(
         pre_built_metadata=pre_built_metadata,
         visual_identity=visual_identity,
         verified_script=vs,
+        warnings=warnings,
     )

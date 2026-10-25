@@ -1,5 +1,14 @@
 # STATUS
 
+## visuals の avoid の型を仕様に合わせ、警告と画像プロンプトの記録を Mac に返す(ブリーフ 013)— 2026-10-25 時点
+- ブランチ `pm/013` に実装済み。main へは未マージ(PM が報告を見てから merge)
+- 019 の回で絵が 2 枚のままだった原因(コードからの見立て): `SceneVisual.avoid` が strict な「str か null」で、List[str] の avoid が各章の scene 0 で型エラーになり、3 章とも scene_splitter に戻った。場面数(3・4)は上限 4 以内で、`max_scenes_per_chapter` は visuals の章では見ない。Windows のログ・prompt_report.md はこのジョブから読めず、未確認
+- avoid は `List[str]`。str は要素 1 つのリスト、null・欄なしは空リスト。要素が str でなければ不正
+- 警告: `WorkflowResult.warnings`(読み込み時の不正 + ターンの時刻が無くて捨てた章)。処理ログにも `[WARN]` で出る
+- 画像プロンプトの記録: 背景の分も run のディレクトリ直下の `prompt_report.md` / `generation_metadata.jsonl`(サムネと同じファイル)。キャッシュ命中の場面(`cached: true`)と場面の指定(`scene_visual`)も残す。パスは `WorkflowResult.prompt_report_path` / `generation_metadata_path`、`build_prompt_log_result_fields(result)`
+- run_remote.py(radio_director 側)に要る変更は `.pm/reports/013.md`
+- arg-remote `test -q`: 804 passed / 8 skipped(skip は試しエンコード)
+
 ## Windows 側の実行に「アップロードしない」スイッチを足す(ブリーフ 012)— 2026-10-25 時点
 - ブランチ `pm/012` に実装済み。main へは未マージ(PM が報告を見てから merge)
 - `run_workflow_sync(skip_upload=True)` か環境変数 `ARG_NO_UPLOAD=1` で、YouTube への公開(サムネ設定・再生リスト追加を含む)だけを飛ばす。制作・メタデータ・サムネ画像は本番と同じ。既定は今までどおりアップロードする

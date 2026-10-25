@@ -1,6 +1,6 @@
 """動画生成インターフェース"""
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from core.models import AppConfig
@@ -14,6 +14,8 @@ class RenderResult:
     duration_sec: float       # 動画の長さ（秒）
     file_size_mb: float       # ファイルサイズ（MB）
     segment_bg_generation_time: float = 0.0  # セグメント背景生成時間（秒）
+    # タイムライン計算での警告（visuals を捨てた等）。result.json の warnings に載せる（013）
+    warnings: list[str] = field(default_factory=list)
 
 
 class IVideoRenderer(ABC):

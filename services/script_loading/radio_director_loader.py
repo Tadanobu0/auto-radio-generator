@@ -24,7 +24,7 @@ VerifiedScript の構造 (Mac 側 SSOT) を Windows 側 `core.models.script.Scri
 """
 import logging
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from pydantic import ValidationError
 
@@ -153,6 +153,7 @@ def build_script_segments(vs: VerifiedScript) -> List[ScriptSegment]:
                 "chapter_title": seg.title if t_idx == 0 else None,
             })
 
+        visuals, visuals_warning = check_scene_visuals(seg.visuals, len(seg.turns), segment_id)
         segments.append(ScriptSegment(
             segment_id=segment_id,
             segment_type=seg.segment_type,  # type: ignore[arg-type]
@@ -161,34 +162,49 @@ def build_script_segments(vs: VerifiedScript) -> List[ScriptSegment]:
             context_summary="",
             token_count=0,
             key_claim_source_idxs=_key_claim_source_idxs(vs, seg, deep_dive_counter),
-            visuals=parse_scene_visuals(seg.visuals, len(seg.turns), segment_id),
+            visuals=visuals,
+            visuals_warning=visuals_warning,
         ))
 
     return segments
+
+
+def collect_visuals_warnings(segments: List[ScriptSegment]) -> List[str]:
+    """build_script_segments が章ごとに残した visuals の警告を、章の順に集める。"""
+    return [seg.visuals_warning for seg in segments if seg.visuals_warning]
 
 
 # spec v1.11.0 §12: 1 章の場面は 1〜4
 MAX_SCENE_VISUALS = 4
 
 
-def parse_scene_visuals(raw: Any, num_turns: int, segment_id: str) -> Optional[List[SceneVisual]]:
-    """segments[].visuals を検査して SceneVisual のリストにする (spec v1.11.0 §12)。
+def check_scene_visuals(
+    raw: Any, num_turns: int, segment_id: str
+) -> Tuple[Optional[List[SceneVisual]], Optional[str]]:
+    """segments[].visuals を検査して (SceneVisual のリスト, 警告文) を返す (spec v1.11.0 §12)。
 
-    - None (欄が無い / null): None。今までどおり scene_splitter で切る
-    - 不正: 警告をログに残して None (その章だけ scene_splitter に戻す。レンダリングは止めない)
+    - None (欄が無い / null): (None, None)。今までどおり scene_splitter で切る
+    - 不正: (None, 警告文)。警告はログにも残す (その章だけ scene_splitter に戻す。レンダリングは止めない)
       空リスト / 場面数が 5 以上 / 必須欄が無い・型が違う / draw が空 /
       start_turn が範囲外・昇順でない・先頭が 0 でない
+    - 正しい: (リスト, None)
     """
     if raw is None:
-        return None
+        return None, None
     reason = _invalid_scene_visuals_reason(raw, num_turns)
     if reason:
-        logger.warning(
-            "visuals of %s is invalid (%s); falling back to scene_splitter for this segment",
-            segment_id, reason,
+        message = (
+            f"visuals of {segment_id} is invalid ({reason}); "
+            "falling back to scene_splitter for this segment"
         )
-        return None
-    return [SceneVisual.model_validate(item) for item in raw]
+        logger.warning(message)
+        return None, message
+    return [SceneVisual.model_validate(item) for item in raw], None
+
+
+def parse_scene_visuals(raw: Any, num_turns: int, segment_id: str) -> Optional[List[SceneVisual]]:
+    """check_scene_visuals の SceneVisual のリストだけを返す (不正・指定なしは None)。"""
+    return check_scene_visuals(raw, num_turns, segment_id)[0]
 
 
 def _invalid_scene_visuals_reason(raw: Any, num_turns: int) -> Optional[str]:

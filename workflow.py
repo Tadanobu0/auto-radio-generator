@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional, List
@@ -101,6 +101,11 @@ class WorkflowResult:
     formatted_description: str = ""  # 概要欄・チャプター結合版（コピー用）
     uploaded_video_url: Optional[str] = None  # YouTubeアップロードURL（成功時）
     upload_skipped: bool = False  # アップロードしない実行で公開を飛ばしたか（012）
+    # 警告（不正な visuals を捨てて scene_splitter に戻した章など）。result.json の warnings へ（013）
+    warnings: list[str] = field(default_factory=list)
+    # 画像プロンプトの記録のパス（prompt_report.md / generation_metadata.jsonl。013）
+    prompt_report_path: Optional[Path] = None
+    generation_metadata_path: Optional[Path] = None
     # サムネイル再作成用
     theme: str = ""  # 元のテーマ
     output_dir: Optional[Path] = None  # 出力先ディレクトリ
@@ -140,6 +145,7 @@ class ProductionPhaseResult:
     audio_duration_sec: float = 0.0
     render_duration_sec: float = 0.0
     segment_bg_generation_time: float = 0.0  # セグメント背景生成時間（秒）
+    warnings: list[str] = field(default_factory=list)  # タイムライン計算での警告（013）
 
 
 def _normalize_non_empty_strings(values: list[str]) -> list[str]:
@@ -597,10 +603,15 @@ async def execute_production_phase(
         chapters=synthesis_result.chapters,
         segments=segments,  # セグメント単位の背景切り替え用
         visual_identity=visual_identity,  # ビジュアルアイデンティティを渡す
+        # 画像プロンプトの記録は run のディレクトリ直下に置く（サムネと同じ場所。013）
+        prompt_log_dir=output_dir,
     )
-    
+
     render_duration = time.time() - render_start
-    
+    render_warnings = list(getattr(render_result, "warnings", None) or [])
+    for message in render_warnings:
+        cb.log(f"[WARN] {message}")
+
     cb.log(f"✓ 動画生成完了: {render_result.file_size_mb:.1f}MB ({render_duration:.1f}秒)")
     cb.progress(0.95, "✅ 動画生成完了")
 
@@ -614,7 +625,8 @@ async def execute_production_phase(
         voicevox_usage=voicevox_usage,
         audio_duration_sec=audio_duration,
         render_duration_sec=render_duration,
-        segment_bg_generation_time=render_result.segment_bg_generation_time
+        segment_bg_generation_time=render_result.segment_bg_generation_time,
+        warnings=render_warnings,
     )
 
 
@@ -942,6 +954,35 @@ def build_upload_result_fields(result: "WorkflowResult") -> dict:
         "upload_skipped": bool(result.upload_skipped),
         "upload_status": status,
         "video_path": str(result.video_path) if result.video_path else None,
+    }
+
+
+PROMPT_REPORT_NAME = "prompt_report.md"
+GENERATION_METADATA_NAME = "generation_metadata.jsonl"
+
+
+def find_prompt_logs(output_base: Optional[Path]) -> tuple[Optional[Path], Optional[Path]]:
+    """run のディレクトリ直下の画像プロンプトの記録（無ければ None）を返す（013）。
+
+    背景（場面ごと）とサムネの両方が、この 2 ファイルに 1 件ずつ追記される。
+    """
+    if not output_base:
+        return None, None
+    report = Path(output_base) / PROMPT_REPORT_NAME
+    jsonl = Path(output_base) / GENERATION_METADATA_NAME
+    return (report if report.exists() else None), (jsonl if jsonl.exists() else None)
+
+
+def build_prompt_log_result_fields(result: "WorkflowResult") -> dict:
+    """result.json に足す、画像プロンプトの記録のパスの欄を返す（013）。
+
+    パスは Windows 上の絶対パス。記録が無ければ None（静的背景のときなど）。
+    """
+    return {
+        "prompt_report_path": str(result.prompt_report_path) if result.prompt_report_path else None,
+        "generation_metadata_path": (
+            str(result.generation_metadata_path) if result.generation_metadata_path else None
+        ),
     }
 
 
@@ -1651,8 +1692,19 @@ def run_workflow_sync(
                 callbacks=callbacks,
             )
 
+            # result.json の warnings に載せる警告（読み込み時 + タイムライン計算時。013）
+            run_warnings = list(getattr(external_phase_result, "warnings", None) or [])
+            run_warnings += list(getattr(production_result, "warnings", None) or [])
+            prompt_report_path, generation_metadata_path = find_prompt_logs(output_base)
+
             callbacks.log(f"\n== 完了 ==")
             callbacks.log(f"動画: {production_result.video_path}")
+            if prompt_report_path:
+                callbacks.log(f"画像プロンプトの記録: {prompt_report_path}")
+            if run_warnings:
+                callbacks.log(f"警告 {len(run_warnings)} 件:")
+                for message in run_warnings:
+                    callbacks.log(f"  - {message}")
             callbacks.log(f"総所要時間: {total_usage.total_duration_sec:.1f}秒")
             callbacks.progress(1.0, "✨ すべて完了しました！")
             
@@ -1672,6 +1724,9 @@ def run_workflow_sync(
                 formatted_description=formatted_description,
                 uploaded_video_url=uploaded_video_url,
                 upload_skipped=upload_skipped,
+                warnings=run_warnings,
+                prompt_report_path=prompt_report_path,
+                generation_metadata_path=generation_metadata_path,
                 theme=theme,
                 output_dir=output_base,
                 segment_bg_generation_time=segment_bg_time,

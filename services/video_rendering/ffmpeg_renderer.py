@@ -140,6 +140,7 @@ class FfmpegRenderer(IVideoRenderer):
         chapters: list[ChapterMarker] | None = None,
         segments: Optional[list[ScriptSegment]] = None,
         visual_identity: Optional[VisualIdentity] = None,
+        prompt_log_dir: Optional[Path] = None,
     ) -> RenderResult:
         """動画を生成（3フェーズパイプライン）
         
@@ -155,6 +156,8 @@ class FfmpegRenderer(IVideoRenderer):
             subtitle_path: 字幕ファイルパス（オプショナル）
             chapters: チャプターマーカー（オプショナル）
             segments: スクリプトセグメント（新規、セグメント単位の背景切り替え用）
+            prompt_log_dir: 画像プロンプトの記録（prompt_report.md / generation_metadata.jsonl）
+                の置き場所。省略時は動画と同じディレクトリ（013 で run のディレクトリ直下に寄せた）
         """
         # 出力ディレクトリを確保
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -186,8 +189,8 @@ class FfmpegRenderer(IVideoRenderer):
             # ========== Phase A: Timeline Calculation ==========
             console.print("[cyan]Phase A: タイムライン計算中...[/cyan]")
             
-            # Extract output_dir from output_path for PromptOps logging
-            output_dir = output_path.parent
+            # PromptOps logging goes to prompt_log_dir (the run directory), else next to the video
+            output_dir = Path(prompt_log_dir) if prompt_log_dir else output_path.parent
             image_provider = ImageProvider(self.config, visual_identity=visual_identity, output_dir=output_dir)
             jingle_provider = JingleProvider()
             
@@ -256,7 +259,8 @@ class FfmpegRenderer(IVideoRenderer):
                 video_path=output_path,
                 duration_sec=total_duration,
                 file_size_mb=file_size_mb,
-                segment_bg_generation_time=segment_bg_generation_time
+                segment_bg_generation_time=segment_bg_generation_time,
+                warnings=list(getattr(self.timeline_calculator, "warnings", None) or []),
             )
         
         except Exception as e:

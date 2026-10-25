@@ -346,7 +346,8 @@ Generate the prompt now:"""
             f"- Point of this scene: {visual.focus}",
             f"- Draw: {visual.draw}",
         ]
-        avoid = (visual.avoid or "").strip()
+        # avoid is a list (spec §12); all items go on one "must NOT show" line
+        avoid = "; ".join(item.strip() for item in visual.avoid if item.strip())
         if avoid:
             direction.append(f"- The picture must NOT show: {avoid}")
         direction_text = "\n".join(direction)
