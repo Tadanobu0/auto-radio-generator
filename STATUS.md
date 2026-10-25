@@ -1,5 +1,12 @@
 # STATUS
 
+## Windows 側の実行に「アップロードしない」スイッチを足す(ブリーフ 012)— 2026-10-25 時点
+- ブランチ `pm/012` に実装済み。main へは未マージ(PM が報告を見てから merge)
+- `run_workflow_sync(skip_upload=True)` か環境変数 `ARG_NO_UPLOAD=1` で、YouTube への公開(サムネ設定・再生リスト追加を含む)だけを飛ばす。制作・メタデータ・サムネ画像は本番と同じ。既定は今までどおりアップロードする
+- `WorkflowResult.upload_skipped` を追加。`build_upload_result_fields(result)` が result.json に足す欄 `upload_skipped` / `upload_status`(uploaded / skipped / not_uploaded)/ `video_path` を返す
+- run_remote.py・launch.ps1 はこのリポジトリに無い(radio_director 側か Windows 上だけ)。Mac 側の渡し方と、それぞれに要る変更は `.pm/reports/012.md` に書いた(radio_director-018 で行う)
+- arg-remote `test -q`: 783 passed / 8 skipped(skip は試しエンコード)
+
 ## verified_script の visuals 欄で場面を切り、画像プロンプトに使う(ブリーフ 011、spec v1.11.0 §12 段 1)— 2026-10-25 時点
 - ブランチ `pm/011` に実装済み。main へは未マージ(PM が報告を見てから merge)
 - loader: `segments[].visuals` を章ごとに検査する(`parse_scene_visuals`)。不正なものは警告を出し、その章だけ scene_splitter に戻す(範囲外・昇順でない・先頭が 0 でない・0 場面・5 場面以上・draw が空・必須欄が無い・型が違う)。ファイル全体は拒否しない
