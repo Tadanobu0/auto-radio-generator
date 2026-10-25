@@ -41,7 +41,13 @@ class GenerationMetadata:
     steps: int = 0  # Inference steps
     sampler: str = ""  # Sampler name
     cfg_scale: float = 1.0  # CFG scale
-    
+
+    # Scene direction from the script (SceneVisual as a dict: start_turn / focus / draw / avoid).
+    # None when the scene was cut by scene_splitter (no visuals). 013
+    scene_visual: Optional[dict] = None
+    # True when the image came from output/.image_cache (no generation in this run). 013
+    cached: bool = False
+
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization
         

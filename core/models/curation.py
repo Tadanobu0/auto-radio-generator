@@ -25,16 +25,29 @@ class SceneVisual(BaseModel):
 
     型は厳密に見る (strict)。"1" や true を start_turn として受けない。
     範囲・昇順・場面数などの章単位の検査は loader (radio_director_loader) で行う。
+    avoid は仕様どおり List[str] (任意)。str 1 つは要素 1 つのリスト、null は空リストとして受ける。
     """
     model_config = ConfigDict(strict=True)
 
     start_turn: int = Field(..., description="場面の最初のターン (章の中の番号、0 始まり)")
     focus: str = Field(..., description="場面の要点")
     draw: str = Field(..., description="描くもの (主役・台数・置き場所など)")
-    avoid: Optional[str] = Field(
-        default=None,
+    avoid: List[str] = Field(
+        default_factory=list,
         description="描いてはいけないもの (台本の助言と逆の状態など)。ネガティブプロンプトには入れない",
     )
+
+    @field_validator("avoid", mode="before")
+    @classmethod
+    def _avoid_as_list(cls, value):
+        """str は要素 1 つのリストに、null は空リストにする。要素の空文字は落とす。"""
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if isinstance(value, list):
+            return [item for item in value if not (isinstance(item, str) and not item.strip())]
+        return value  # 型の違うものは strict の検査でエラーにする
 
 
 class ScriptSegment(BaseModel):
@@ -72,6 +85,13 @@ class ScriptSegment(BaseModel):
     scene_visual: Optional[SceneVisual] = Field(
         default=None,
         description="このセグメント (場面) の画像に描くもの。画像プロンプトの生成で使う",
+    )
+    visuals_warning: Optional[str] = Field(
+        default=None,
+        description=(
+            "visuals を不正として捨てたときの警告文 (loader が入れる)。"
+            "WorkflowResult.warnings 経由で result.json の warnings に載せる"
+        ),
     )
 
 

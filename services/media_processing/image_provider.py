@@ -13,6 +13,7 @@ import asyncio
 import hashlib
 import logging
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ from rich.console import Console
 
 from core.models import AppConfig
 from core.models.curation import ScriptSegment
+from core.models.generation_metadata import GenerationMetadata
 from core.models.visual import VisualIdentity, VisualPalette
 from services.media_processing.prompt_ops_logger import PromptOpsLogger
 
@@ -188,6 +190,19 @@ class ImageProvider:
             if cache_path.exists():
                 console.print(f"[dim]Using cached image: {cache_path.name}[/dim]")
                 logger.info(f"Cache hit for segment {segment.segment_id}")
+                # Record the prompt even on a cache hit, so the run's report lists every scene (013)
+                if self.logger:
+                    self.logger.log_generation(GenerationMetadata(
+                        timestamp=datetime.utcnow().isoformat() + "Z",
+                        image_path=str(cache_path),
+                        context_type="segment",
+                        segment_id=segment.segment_id,
+                        segment_type=segment.segment_type,
+                        prompt=prompt,
+                        visual_identity=self._visual_identity_dict(),
+                        scene_visual=self._scene_visual_dict(segment),
+                        cached=True,
+                    ))
                 return cache_path
             
             # 3. Generate image via FluxClient
@@ -195,14 +210,8 @@ class ImageProvider:
                 console.print(f"[cyan]Generating image for {segment.segment_id}...[/cyan]")
                 
                 # Prepare visual identity dict for metadata
-                vi_dict = {}
-                if self.visual_identity:
-                    vi_dict = {
-                        "primary_color": self.visual_identity.primary_color,
-                        "secondary_color": self.visual_identity.secondary_color,
-                        "aesthetic": self.visual_identity.aesthetic,
-                    }
-                
+                vi_dict = self._visual_identity_dict()
+
                 # Generate image with metadata
                 image_path, metadata = await self.image_client.generate_image(
                     prompt=prompt,
@@ -216,8 +225,12 @@ class ImageProvider:
                 console.print(f"[green]✓ Generated: {image_path.name} ({metadata.generation_time_sec:.1f}s)[/green]")
                 logger.info(f"Image generated for segment {segment.segment_id}: {image_path} ({metadata.generation_time_sec:.1f}s)")
                 
-                # Log to PromptOps (fail-safe)
+                # Log to PromptOps (fail-safe), with the script's scene direction if any (013)
                 if self.logger:
+                    try:
+                        metadata.scene_visual = self._scene_visual_dict(segment)
+                    except Exception:
+                        pass
                     self.logger.log_generation(metadata)
                 
                 # Update end time for wall-clock tracking
@@ -233,6 +246,22 @@ class ImageProvider:
                 console.print(f"[yellow]⚠ Generation failed, using static fallback[/yellow]")
                 return self._select_static_image(segment)
     
+    def _visual_identity_dict(self) -> dict:
+        """Colors and aesthetic of the visual identity, for the prompt records."""
+        if not self.visual_identity:
+            return {}
+        return {
+            "primary_color": self.visual_identity.primary_color,
+            "secondary_color": self.visual_identity.secondary_color,
+            "aesthetic": self.visual_identity.aesthetic,
+        }
+
+    @staticmethod
+    def _scene_visual_dict(segment: ScriptSegment) -> Optional[dict]:
+        """The script's SceneVisual of this scene as a dict (None if the scene has none)."""
+        visual = getattr(segment, "scene_visual", None)
+        return visual.model_dump() if visual is not None else None
+
     def _select_static_image(self, segment: ScriptSegment) -> Path:
         """Select background image from local assets
         

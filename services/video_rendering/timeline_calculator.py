@@ -98,6 +98,8 @@ class TimelineCalculator:
         self.pre_jingle_pause_sec = getattr(video_config, "pre_jingle_pause_sec", 0.5) if video_config else 0.5
         self.scene_target_sec = getattr(video_config, "scene_target_sec", 90.0) if video_config else 90.0
         self.max_scenes_per_chapter = getattr(video_config, "max_scenes_per_chapter", 4) if video_config else 4
+        # Warnings of the last calculate_timeline (visuals dropped here), for result.json
+        self.warnings: list[str] = []
 
     def _plan_scene_starts(self, segment: ScriptSegment, timing: SegmentTiming) -> list[int]:
         """First turn of each scene in the segment ([0] = one image for the whole segment)."""
@@ -115,21 +117,23 @@ class TimelineCalculator:
             max_scenes=self.max_scenes_per_chapter,
         )
 
-    @staticmethod
-    def _usable_visuals(segment: ScriptSegment, timing: SegmentTiming) -> Optional[list[SceneVisual]]:
+    def _usable_visuals(self, segment: ScriptSegment, timing: SegmentTiming) -> Optional[list[SceneVisual]]:
         """The script's own scenes (segment.visuals), or None to use scene_splitter.
 
         The loader has already checked the visuals; here they also need a start time
         for every turn (the scene times come from turn_start_secs, as with the splitter).
+        A dropped visuals is also kept in self.warnings (for result.json).
         """
         if not segment.visuals:
             return None
         turn_starts = list(getattr(timing, "turn_start_secs", None) or [])
         if not segment.turns or len(turn_starts) != len(segment.turns):
-            logger.warning(
+            message = (
                 f"visuals of {segment.segment_id} ignored: {len(turn_starts)} turn start times "
                 f"for {len(segment.turns)} turns; falling back to scene_splitter"
             )
+            logger.warning(message)
+            self.warnings.append(message)
             return None
         return segment.visuals
 
@@ -174,7 +178,8 @@ class TimelineCalculator:
             VideoTimeline: Complete timeline with all segment information
         """
         console.print("[cyan]Calculating video timeline...[/cyan]")
-        
+        self.warnings = []
+
         timeline_entries = []
         scene_turn_starts: list[list[float]] = []  # per entry, for assign_scene_times
 
