@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-10-26 背景の前置きに「plain matte unbranded device surfaces」を足し、前置きの上限を 100 → 134 字に広げる(ブリーフ 015、PM 判断)
+- 決定: `SEGMENT_PROMPT_PREFIX` の末尾に否定形の無い「plain matte unbranded device surfaces」だけを足す(→ 134 字)。007 の既存テスト `test_prefix_is_short_and_has_no_screen` の `len(prefix) <= 100` を、この長さちょうどの `<= 134` に変えた(他の検査はそのまま。PM 了承)。draw にない記号を足させない指示は、visuals の場面の最後の手順(番号の数は変えない)と、draw の短い英文の指示に 1 文ずつ足した。visuals の無い場面・サムネイルは変えない
+- 理由: FLUX schnell は否定の名詞を名詞として読み、「no logos」がロゴを呼ぶおそれがある(2026-10-26 PM 判断)。前置きと本文をつなぐ形(`PREFIX + body`)は多くの既存テストが見ていて、別の定数に分けても落ちるので、上限を広げるのが変更が一番小さい
+- 却下案: ブリーフの例文「… with no logos, model names or printed characters」(179 字。否定の名詞を描くおそれ。2026-10-25 に一度入れて PM 判断で撤回)/ 100 字に収まるよう「logos」だけ足す / 本文の後ろに付ける(先頭に置く方針と既存テストに反する)/ 新しい番号の手順を足す(既存テストが番号の数を見ている)
+
 ## 2026-10-25 場面の指定がある場面のプロンプトは、作り直し → draw の短い英文の順に落とし、汎用の文は使わない(ブリーフ 014)
 - 決定: scene_visual がある場面でプロンプト生成が失敗したら(例外・空・1000 字超・置き場所のチェック)、理由を添えて 1 回作り直す。だめなら LLM に focus・draw(と avoid の逆の状態)を 1 文の英語に訳させ、前置き・配色・フィルムの語を付ける。それも LLM が答えなければ、退けた出力を使う(置き場所が崩れたものはそのまま、長すぎたものはカンマで切る)。汎用の文は LLM がまったく答えないときだけ。替えたときは、章・場面・理由を `ImagePromptGenerator.warnings` → `ImageProvider.warnings` → `RenderResult.warnings` → `WorkflowResult.warnings` と運ぶ。FLUX 失敗で静止画にしたときも同じ。visuals の無い場面は従来どおり作り直さず、warnings だけ足す
 - 置き場所のチェックは「draw(か avoid)が床から離すのに `on the floor` / `low shelf` 等がある」「draw の高さの語が家具に付かず機器に付いている(`waist-high white router`)」の 2 つだけを弾く。語が無いことは弾かない

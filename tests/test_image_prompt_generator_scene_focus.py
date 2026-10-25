@@ -170,7 +170,8 @@ class TestPrefix:
         prefix = ImagePromptGenerator.SEGMENT_PROMPT_PREFIX
         assert "screen" not in prefix.lower()
         assert "lettering" not in prefix.lower()
-        assert len(prefix) <= 100
+        # 015 で機器の表面の語句を足し、100 → 134 字に広げた (2026-10-26 PM 了承)
+        assert len(prefix) <= 134
         # 肯定形の言い回しを先に置く
         assert prefix.startswith("An unpopulated, wordless scene")
 
