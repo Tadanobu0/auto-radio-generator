@@ -70,7 +70,10 @@ class ImageProvider:
         # Track wall-clock time for all image generation
         self._generation_start_time: Optional[float] = None
         self._generation_end_time: Optional[float] = None
-        
+
+        # Fallbacks (generic / short prompt, static image) per scene, for result.json (014)
+        self.warnings: list[str] = []
+
         # Scan available static images (always scan for fallback support)
         self._static_images: dict[str, list[Path]] = {}
         self._scan_static_images()
@@ -149,10 +152,35 @@ class ImageProvider:
                 logger.error(f"Dynamic image generation failed: {e}")
                 logger.info("Falling back to static image selection")
                 console.print(f"[yellow]⚠ Dynamic generation failed, using static fallback[/yellow]")
+                self._take_prompt_warnings()
+                self._add_static_fallback_warning(segment, e)
                 return self._select_static_image(segment)
+            finally:
+                self._take_prompt_warnings()
         else:
             return self._select_static_image(segment)
-    
+
+    def _warning_list(self) -> list[str]:
+        if not isinstance(getattr(self, "warnings", None), list):
+            self.warnings = []
+        return self.warnings
+
+    def _take_prompt_warnings(self) -> None:
+        """Move the prompt generator's fallback warnings into self.warnings (in order)."""
+        generator = getattr(self, "prompt_generator", None)
+        pending = getattr(generator, "warnings", None)
+        if isinstance(pending, list) and pending:
+            self._warning_list().extend(pending)
+            pending.clear()
+
+    def _add_static_fallback_warning(self, segment: ScriptSegment, error: Exception) -> None:
+        """Keep a static-image fallback in self.warnings (for result.json)."""
+        text = " ".join(str(error).split())[:160]
+        self._warning_list().append(
+            f"background image for {segment.segment_id}: image generation failed "
+            f"({type(error).__name__}: {text}); used a static image"
+        )
+
     async def _generate_dynamic_image(self, segment: ScriptSegment) -> Path:
         """Generate background image via FLUX.1 with concurrency control
         
@@ -244,6 +272,8 @@ class ImageProvider:
                 
                 logger.error(f"Dynamic image generation failed: {e}, falling back to static mode")
                 console.print(f"[yellow]⚠ Generation failed, using static fallback[/yellow]")
+                self._take_prompt_warnings()
+                self._add_static_fallback_warning(segment, e)
                 return self._select_static_image(segment)
     
     def _visual_identity_dict(self) -> dict:

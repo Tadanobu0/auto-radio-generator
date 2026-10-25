@@ -260,7 +260,7 @@ class FfmpegRenderer(IVideoRenderer):
                 duration_sec=total_duration,
                 file_size_mb=file_size_mb,
                 segment_bg_generation_time=segment_bg_generation_time,
-                warnings=list(getattr(self.timeline_calculator, "warnings", None) or []),
+                warnings=self._collect_warnings(image_provider),
             )
         
         except Exception as e:
@@ -269,6 +269,14 @@ class FfmpegRenderer(IVideoRenderer):
             console.print(f"[yellow]中間ファイルを保持（デバッグ用）: {temp_dir}[/yellow]")
             raise
     
+    def _collect_warnings(self, image_provider) -> list[str]:
+        """Warnings for result.json: the timeline's (visuals dropped, 013), then the images' (014)."""
+        warnings = list(getattr(self.timeline_calculator, "warnings", None) or [])
+        image_warnings = getattr(image_provider, "warnings", None)
+        if isinstance(image_warnings, list):
+            warnings += image_warnings
+        return warnings
+
     async def _mux_tracks(self, video_track: Path, audio_track: Path, output_path: Path) -> None:
         """Mux video and audio tracks (Phase C)
         
