@@ -1,5 +1,11 @@
 # DECISIONS
 
+## 2026-10-25 場面の指定がある場面のプロンプトは、作り直し → draw の短い英文の順に落とし、汎用の文は使わない(ブリーフ 014)
+- 決定: scene_visual がある場面でプロンプト生成が失敗したら(例外・空・1000 字超・置き場所のチェック)、理由を添えて 1 回作り直す。だめなら LLM に focus・draw(と avoid の逆の状態)を 1 文の英語に訳させ、前置き・配色・フィルムの語を付ける。それも LLM が答えなければ、退けた出力を使う(置き場所が崩れたものはそのまま、長すぎたものはカンマで切る)。汎用の文は LLM がまったく答えないときだけ。替えたときは、章・場面・理由を `ImagePromptGenerator.warnings` → `ImageProvider.warnings` → `RenderResult.warnings` → `WorkflowResult.warnings` と運ぶ。FLUX 失敗で静止画にしたときも同じ。visuals の無い場面は従来どおり作り直さず、warnings だけ足す
+- 置き場所のチェックは「draw(か avoid)が床から離すのに `on the floor` / `low shelf` 等がある」「draw の高さの語が家具に付かず機器に付いている(`waist-high white router`)」の 2 つだけを弾く。語が無いことは弾かない
+- 理由: draw は日本語で、LLM 抜きでは英語にできない。訳だけの呼び出しは短く暴走しにくい。語の有無まで見ると、既存テストの出力(「on a wooden shelf」)が通らず、場面ごとの呼び出しも増える
+- 却下案: draw を決まった英文に組む(日本語を訳せない)/ 長い出力を切って先に使う(ブリーフの「focus・draw をもとにした英文」から外れ、主題がぼやける)/ step を 1 つ足して指示を強める(既存テストが番号の数を見ている。step 1 の文を足した)
+
 ## 2026-10-25 visuals の avoid は List[str] で受け、警告と画像プロンプトの記録を WorkflowResult に載せる(ブリーフ 013)
 - 決定: `SceneVisual.avoid` を `List[str]`(既定は空リスト)にする。str 1 つは要素 1 つのリスト、null は空リストとして受け、空白だけの要素は落とす。要素が str でないものは不正(その章は scene_splitter)。プロンプトでは要素を `; ` でつないで「must NOT show」の 1 行にする。不正な visuals の警告は `ScriptSegment.visuals_warning` → `ExternalScriptPhaseResult.warnings`、タイムラインで捨てたものは `TimelineCalculator.warnings` → `RenderResult.warnings` → `ProductionPhaseResult.warnings` と運び、`WorkflowResult.warnings` にまとめる。画像プロンプトの記録(`prompt_report.md` / `generation_metadata.jsonl`)は、背景の分も run のディレクトリ直下(サムネと同じファイル)に書き、キャッシュ命中の場面と場面の指定(scene_visual)も残す。パスは `WorkflowResult.prompt_report_path` / `generation_metadata_path` と `build_prompt_log_result_fields(result)` で返す
 - 理由: interface_spec §12 では avoid は List[str](011 のブリーフの要約の誤り)。Mac に返るのは result.json だけで、そこを書くのは radio_director 側の run_remote.py。背景の記録は `videos/` の下、サムネの記録は run の直下と 2 か所に分かれていて、キャッシュ命中の場面は記録されなかった
