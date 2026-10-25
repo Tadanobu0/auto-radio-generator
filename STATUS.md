@@ -1,11 +1,11 @@
 # STATUS
 
-## 画像プロンプトの固定文に「機器の表面は無地」を足す(ブリーフ 015)— 2026-10-25 時点
+## 画像プロンプトの固定文に「機器の表面は無地」を足す(ブリーフ 015)— 2026-10-26 時点
 - ブランチ `pm/015` に実装済み。main へは未マージ(PM が報告を見てから merge)。効き目は merge・deploy 後の /render で見る
-- 背景の前置き: 「An unpopulated, wordless scene with no people, no hands, no faces, no text, signage or labels, plain unbranded device surfaces with no logos, model names or printed characters: 」(96 → 179 字)。汎用の文・draw の短い英文にも同じ前置きが付く。サムネイルは変えていない
+- 背景の前置き: 「An unpopulated, wordless scene with no people, no hands, no faces, no text, signage or labels, plain matte unbranded device surfaces: 」(134 字)。足した語句は否定形なし(2026-10-26 PM 判断)。汎用の文・draw の短い英文にも同じ前置きが付く。サムネイルは変えていない
 - 指示: visuals の場面の最後の手順に「draw にない記号・図形(光る線や弧・波・矢印・Wi-Fi のマーク)を足さない」を 1 文足した(番号の数は変えない)。draw の短い英文の指示にも 1 行足した。visuals の無い場面の指示文は変えていない
-- 既存テストの前置きの上限 `<= 100` を `<= 180` に変えた(PM の確認待ち。`.pm/reports/015.md` の要判断事項)
-- arg-remote `test -q`: 838 passed / 8 skipped(skip は試しエンコード)
+- 既存テストの前置きの上限 `<= 100` を、前置きの長さちょうどの `<= 134` に変えた(PM 了承)
+- arg-remote `test -q`: 839 passed / 8 skipped(skip は試しエンコード)
 
 ## visuals からのプロンプト作りの取りこぼしを直す(ブリーフ 014)— 2026-10-25 時点
 - ブランチ `pm/014` に実装済み。main へは未マージ(PM が報告を見てから merge)
