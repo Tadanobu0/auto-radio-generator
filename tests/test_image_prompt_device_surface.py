@@ -11,17 +11,26 @@ from services.script_generation.image_prompt_generator import ImagePromptGenerat
 from tests.test_scene_prompt_fallback import GOOD_BODY, SHORT_SENTENCE, _long_body, _response, _scene
 from tests.test_scene_visuals import FACTORY_PATH, _make_generator
 
-DEVICE_CLAUSE = "plain unbranded device surfaces with no logos, model names or printed characters"
+DEVICE_CLAUSE = "plain matte unbranded device surfaces"
 NO_EXTRA_SYMBOLS = "Add no symbol or graphic that \"Draw\" does not name"
 
 
 def test_prefix_has_plain_device_surface_clause():
     prefix = ImagePromptGenerator.SEGMENT_PROMPT_PREFIX
-    assert DEVICE_CLAUSE in prefix
-    # 既存の要素はそのまま、肯定形が先頭、最後は ": " で本文につなぐ
-    assert prefix.startswith("An unpopulated, wordless scene with no people, no hands, no faces, no text, signage or labels, ")
-    assert prefix.endswith(f"{DEVICE_CLAUSE}: ")
+    assert prefix == (
+        "An unpopulated, wordless scene with no people, no hands, no faces, no text, signage or labels, "
+        f"{DEVICE_CLAUSE}: "
+    )
     assert prefix.lower().count("no text") == 1
+    # 既存テストの上限 (135 字) はこの長さちょうど
+    assert len(prefix) == 135
+
+
+def test_device_clause_is_positive_only():
+    """FLUX schnell は否定の名詞を描くので、足した語句には否定形も、ロゴ・型番・文字の名詞も入れない (2026-10-26 PM 判断)。"""
+    added = ImagePromptGenerator.SEGMENT_PROMPT_PREFIX.split("labels, ", 1)[1]
+    for word in ("no ", "without", "logo", "model name", "character", "brand name"):
+        assert word not in added.lower()
 
 
 @patch(FACTORY_PATH)

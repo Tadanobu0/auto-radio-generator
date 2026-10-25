@@ -38,11 +38,11 @@ class ImagePromptGenerator:
     # Kept short and led by positive wording ("unpopulated, wordless"): FLUX reads negated nouns
     # as nouns, so every "no X" risks inviting X (e.g. "screen" was dropped for that reason).
     # The device-surface clause (015) was added after garbled logo-like words appeared on a
-    # router's front panel despite "no text, signage or labels".
+    # router's front panel despite "no text, signage or labels"; it is positive only, for the
+    # same reason (no "no logos").
     SEGMENT_PROMPT_PREFIX = (
         "An unpopulated, wordless scene with no people, no hands, no faces, "
-        "no text, signage or labels, "
-        "plain unbranded device surfaces with no logos, model names or printed characters: "
+        "no text, signage or labels, plain matte unbranded device surfaces: "
     )
 
     # Upper bound for the script excerpt handed to the LLM (same budget as the former
