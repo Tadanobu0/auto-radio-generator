@@ -1,5 +1,11 @@
 # DECISIONS
 
+## 2026-10-25 visuals の avoid は List[str] で受け、警告と画像プロンプトの記録を WorkflowResult に載せる(ブリーフ 013)
+- 決定: `SceneVisual.avoid` を `List[str]`(既定は空リスト)にする。str 1 つは要素 1 つのリスト、null は空リストとして受け、空白だけの要素は落とす。要素が str でないものは不正(その章は scene_splitter)。プロンプトでは要素を `; ` でつないで「must NOT show」の 1 行にする。不正な visuals の警告は `ScriptSegment.visuals_warning` → `ExternalScriptPhaseResult.warnings`、タイムラインで捨てたものは `TimelineCalculator.warnings` → `RenderResult.warnings` → `ProductionPhaseResult.warnings` と運び、`WorkflowResult.warnings` にまとめる。画像プロンプトの記録(`prompt_report.md` / `generation_metadata.jsonl`)は、背景の分も run のディレクトリ直下(サムネと同じファイル)に書き、キャッシュ命中の場面と場面の指定(scene_visual)も残す。パスは `WorkflowResult.prompt_report_path` / `generation_metadata_path` と `build_prompt_log_result_fields(result)` で返す
+- 理由: interface_spec §12 では avoid は List[str](011 のブリーフの要約の誤り)。Mac に返るのは result.json だけで、そこを書くのは radio_director 側の run_remote.py。背景の記録は `videos/` の下、サムネの記録は run の直下と 2 か所に分かれていて、キャッシュ命中の場面は記録されなかった
+- 却下案: str だけ受けるまま(仕様と違う)/ logging のハンドラで警告を拾う(何でも拾い、どこで捨てたかが曖昧)/ 記録を `videos/` の下に残す(サムネと分かれ、Mac が 2 か所を取りに行く)
+
+
 ## 2026-10-25 アップロードしない実行は環境変数 ARG_NO_UPLOAD と skip_upload 引数で切る(ブリーフ 012)
 - 決定: `run_workflow_sync(skip_upload=True)` か、環境変数 `ARG_NO_UPLOAD` が `1`/`true`/`yes`/`on` のとき、YouTube への公開(`_upload_to_youtube` 全体。サムネ設定・再生リスト追加を含む)だけを飛ばす。`upload_override` より優先する。既定(どちらも無し)は今までどおり。結果は `WorkflowResult.upload_skipped` に入れ、`build_upload_result_fields(result)` が result.json に足す欄(`upload_skipped` / `upload_status` / `video_path`)を返す
 - 理由: run_remote.py と launch.ps1 はこのリポジトリに無い(履歴にも無く、Windows の本番ツリーにも無い)。環境変数なら launch.ps1 がそのプロセスにだけ設定すれば、run_remote.py の改修前でも公開が止まる。止める向きなので、どこから来ても優先して安全
