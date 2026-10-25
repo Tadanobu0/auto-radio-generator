@@ -22,8 +22,8 @@ def test_prefix_has_plain_device_surface_clause():
         f"{DEVICE_CLAUSE}: "
     )
     assert prefix.lower().count("no text") == 1
-    # 既存テストの上限 (135 字) はこの長さちょうど
-    assert len(prefix) == 135
+    # 既存テストの上限 (134 字) はこの長さちょうど
+    assert len(prefix) == 134
 
 
 def test_device_clause_is_positive_only():
