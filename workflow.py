@@ -106,6 +106,10 @@ class WorkflowResult:
     # 画像プロンプトの記録のパス（prompt_report.md / generation_metadata.jsonl。013）
     prompt_report_path: Optional[Path] = None
     generation_metadata_path: Optional[Path] = None
+    # 画像だけを先に作る実行か（016）。True のとき動画・音声・字幕は作っていない
+    images_only: bool = False
+    # 場面ごとの背景画像の一覧（016）。result.json の scene_images へ（build_scene_images_result_fields）
+    scene_images: list[dict] = field(default_factory=list)
     # サムネイル再作成用
     theme: str = ""  # 元のテーマ
     output_dir: Optional[Path] = None  # 出力先ディレクトリ
@@ -146,6 +150,15 @@ class ProductionPhaseResult:
     render_duration_sec: float = 0.0
     segment_bg_generation_time: float = 0.0  # セグメント背景生成時間（秒）
     warnings: list[str] = field(default_factory=list)  # タイムライン計算での警告（013）
+    scene_images: list[dict] = field(default_factory=list)  # 場面ごとの背景画像の一覧（016）
+
+
+@dataclass
+class ImagesOnlyPhaseResult:
+    """画像だけを先に作る実行（016）の結果"""
+    scene_images: list[dict]            # run の下にコピーした後の一覧（image_path はコピー先）
+    warnings: list[str] = field(default_factory=list)
+    segment_bg_generation_time: float = 0.0
 
 
 def _normalize_non_empty_strings(values: list[str]) -> list[str]:
@@ -534,7 +547,8 @@ async def execute_production_phase(
     speed_scale: Optional[float] = None,
     segments: Optional[list] = None,
     visual_identity: Optional[VisualIdentity] = None,
-    callbacks: Optional[ProgressCallback] = None
+    callbacks: Optional[ProgressCallback] = None,
+    scene_options=None,
 ) -> ProductionPhaseResult:
     """制作フェーズ: 音声合成 → 動画生成
     
@@ -547,7 +561,8 @@ async def execute_production_phase(
         segments: スクリプトセグメント（セグメント単位の背景切り替え用）
         visual_identity: ビジュアルアイデンティティ（色とスタイルの統一用）
         callbacks: 進捗コールバック
-    
+        scene_options: 前の run の画像の使い回し・指定場面の作り直し（SceneImageOptions。016）
+
     Returns:
         ProductionPhaseResult: 動画ファイルパスと各種メタデータ
     """
@@ -594,7 +609,9 @@ async def execute_production_phase(
     bgm_file = project_root / config.yaml.paths.bgm_file
     
     ffmpeg = FfmpegRenderer(config)
+    scene_kwargs = {"scene_options": scene_options} if scene_options is not None else {}
     render_result = await ffmpeg.render(
+        **scene_kwargs,
         synthesis_result=synthesis_result,
         background_image=background_image,
         bgm_file=bgm_file,
@@ -627,6 +644,76 @@ async def execute_production_phase(
         render_duration_sec=render_duration,
         segment_bg_generation_time=render_result.segment_bg_generation_time,
         warnings=render_warnings,
+        scene_images=list(getattr(render_result, "scene_images", None) or []),
+    )
+
+
+async def execute_images_only_phase(
+    segments: Optional[list],
+    config: AppConfig,
+    output_dir: Path,
+    visual_identity: Optional[VisualIdentity] = None,
+    scene_options=None,
+    callbacks: Optional[ProgressCallback] = None,
+    speed_scale: Optional[float] = None,
+) -> ImagesOnlyPhaseResult:
+    """画像だけを先に作る（016）: 場面の区切り → 背景画像の生成 → run の下にコピー。
+
+    音声は作らない。場面の区切りは本番と同じ TimelineCalculator.plan_scene_segments を使う
+    （visuals がある章は台本の start_turn で切るので本番と同じ。visuals の無い章は
+    発話の長さを文字数から見積もって切るため、本番と場面の数が変わることがある）。
+    画像は <output_dir>/scene_images/ にコピーし、一覧を <output_dir>/scene_images.json に書く。
+    """
+    from core.interfaces import SegmentTiming
+    from services.media_processing import ImageProvider
+    from services.media_processing.scene_images import estimate_turn_times, export_scene_images
+    from services.video_rendering.timeline_calculator import TimelineCalculator
+
+    cb = callbacks or ProgressCallback()
+    cb.log("\n== 画像だけを作る実行: 場面ごとの背景画像 ==")
+    cb.progress(0.20, "🖼️ 場面ごとの背景画像を生成中...")
+
+    provider = ImageProvider(config, visual_identity=visual_identity, output_dir=output_dir)
+    if scene_options is not None:
+        provider.scene_options = scene_options
+    calculator = TimelineCalculator(config)
+    calculator.warnings = []
+
+    audio_config = getattr(config.yaml, "audio_synthesizer", None)
+    if speed_scale is None:
+        speed_scale = getattr(audio_config, "speed_scale", 1.0)
+    speed_scale = float(speed_scale or 1.0)
+    pause_sec = float(getattr(audio_config, "pause_between_phrases_ms", 500) or 0) / 1000.0
+
+    start_sec = 0.0
+    segment_list = list(segments or [])
+    for i, segment in enumerate(segment_list):
+        starts, end = estimate_turn_times(list(segment.turns or []), speed_scale, pause_sec)
+        timing = SegmentTiming(
+            segment_id=segment.segment_id,
+            segment_type=segment.segment_type,
+            topic_title=segment.topic_title,
+            start_sec=start_sec,
+            end_sec=start_sec + end,
+            duration_sec=end,
+            turn_start_secs=[start_sec + s for s in starts],
+        )
+        _, scene_segments = calculator.plan_scene_segments(segment, timing)
+        for scene_segment in scene_segments:
+            await provider.get_image_for_segment(scene_segment)
+        start_sec = timing.end_sec + pause_sec
+        cb.progress(0.20 + 0.75 * (i + 1) / max(1, len(segment_list)), f"🖼️ 背景画像 {i + 1}/{len(segment_list)} 章")
+
+    provider.finish_scene_images()
+    exported = export_scene_images(provider.scene_records, output_dir)
+    warnings = list(calculator.warnings) + list(provider.warnings)
+    for message in warnings:
+        cb.log(f"[WARN] {message}")
+    cb.log(f"✓ 背景画像 {len(exported)} 枚: {Path(output_dir) / 'scene_images'}")
+    return ImagesOnlyPhaseResult(
+        scene_images=exported,
+        warnings=warnings,
+        segment_bg_generation_time=provider.get_total_generation_time(),
     )
 
 
@@ -986,6 +1073,17 @@ def build_prompt_log_result_fields(result: "WorkflowResult") -> dict:
     }
 
 
+def build_scene_images_result_fields(result: "WorkflowResult") -> dict:
+    """result.json に足す、場面ごとの背景画像の一覧の欄を返す（016）。
+
+    各要素は segment_id / scene_index（章の中の 0 始まり）/ image_path（Windows 上の絶対パス）/
+    scene_visual / prompt / seed（不明なら None）/ cached / source
+    （"generated" / "cache" / "reused" / "static"）。
+    images_only の実行では image_path は <run>/scene_images/ の下のコピーを指す。
+    """
+    return {"scene_images": [dict(entry) for entry in (result.scene_images or [])]}
+
+
 def _upload_to_youtube(
     *,
     config: AppConfig,
@@ -1293,6 +1391,10 @@ def run_workflow_sync(
     research_import_filepath: Optional[str] = None,
     external_script_path: Optional[str] = None,
     skip_upload: bool = False,
+    images_only: bool = False,
+    regen_scenes: Optional[List[str]] = None,
+    regen_seed_offset: Optional[int] = None,
+    reuse_images_from: Optional[str] = None,
 ) -> WorkflowResult:
     """同期版ワークフロー実行（Gradio から呼び出し用 / 外部台本モード前提）
 
@@ -1314,6 +1416,17 @@ def run_workflow_sync(
             だけを飛ばす。音声・画像・字幕・エンコード・メタデータ・サムネ画像は
             本番と同じに作る。環境変数 ARG_NO_UPLOAD=1 でも同じになり、
             どちらかが指定されれば upload_override より優先する（012）
+        images_only: True なら台本の読み込み・場面の区切り・背景画像の生成までで止める。
+            音声・字幕・エンコード・メタデータ・サムネ・アップロードはしない。画像は
+            <run>/scene_images/ にコピーし、一覧を <run>/scene_images.json と
+            WorkflowResult.scene_images に入れる（016）
+        regen_scenes: 作り直す場面の segment_id のリスト（例 ["deep_dive_2_scene3"]）。
+            その場面だけキャッシュを使わず、seed をずらして作り直す（016）
+        regen_seed_offset: 作り直す場面の seed のずらし幅（既定 1）。元の seed は
+            reuse_images_from の run の記録から取り、無ければ segment_id から決めた値（016）
+        reuse_images_from: 前の images_only の run の出力ディレクトリ。その run の
+            scene_images.json を読み、segment_id が合う場面はその画像をそのまま使う。
+            合わない場面は今までどおり作り、どちらも warnings に残す（016）
 
     Returns:
         WorkflowResult: 実行結果（Usage/Cost情報含む）
@@ -1375,7 +1488,30 @@ def run_workflow_sync(
             # ProgressCallbackにlog_writerを設定
             callbacks.log_writer = log_writer
             callbacks.log(f"出力ディレクトリ: {output_base}")
-            
+
+            # 場面の画像の使い回し・作り直し（016）。指定が無ければ None（今までどおり）
+            scene_options = None
+            if regen_scenes or reuse_images_from:
+                from services.media_processing.scene_images import build_scene_image_options
+                try:
+                    scene_options = build_scene_image_options(
+                        regen_scenes=regen_scenes,
+                        regen_seed_offset=regen_seed_offset,
+                        reuse_images_from=reuse_images_from,
+                    )
+                except ValueError as _e:
+                    callbacks.log(f"❌ {_e}")
+                    if log_writer:
+                        log_writer.finalize()
+                    return WorkflowResult(success=False, error_message=str(_e), output_dir=output_base)
+                if scene_options.reuse_dir is not None:
+                    callbacks.log(f"前の run の画像を使い回します: {scene_options.reuse_dir}")
+                if scene_options.regen_scenes:
+                    callbacks.log(
+                        f"作り直す場面: {', '.join(sorted(scene_options.regen_scenes))}"
+                        f"（seed +{scene_options.regen_seed_offset}）"
+                    )
+
             # Usage集約用
             total_usage = TotalUsage()
             
@@ -1572,8 +1708,50 @@ def run_workflow_sync(
                     total_usage.llm_usage[provider] = scripting_result.gemini_usage
             total_usage.research_duration_sec = scripting_result.research_duration_sec
             total_usage.script_duration_sec = scripting_result.script_duration_sec
-            
+
+            # ========== 画像だけを作る実行（016）: 背景画像までで止める ==========
+            if images_only:
+                images_result = await execute_images_only_phase(
+                    segments=scripting_result.segments,
+                    config=config,
+                    output_dir=output_base,
+                    speed_scale=overrides_obj.speed_scale,
+                    visual_identity=scripting_result.visual_identity,
+                    scene_options=scene_options,
+                    callbacks=callbacks,
+                )
+                run_warnings = list(getattr(external_phase_result, "warnings", None) or [])
+                run_warnings += list(images_result.warnings)
+                prompt_report_path, generation_metadata_path = find_prompt_logs(output_base)
+                total_usage.segment_bg_generation_time = images_result.segment_bg_generation_time
+                total_usage.total_duration_sec = time.time() - workflow_start
+                callbacks.log("\n== 完了（画像だけを作る実行。音声・動画・アップロードは行っていません） ==")
+                callbacks.log(f"場面の画像: {len(images_result.scene_images)} 枚 ({output_base / 'scene_images'})")
+                if run_warnings:
+                    callbacks.log(f"警告 {len(run_warnings)} 件:")
+                    for message in run_warnings:
+                        callbacks.log(f"  - {message}")
+                callbacks.progress(1.0, "✨ 背景画像の生成が完了しました")
+                if log_writer:
+                    log_writer.finalize()
+                return WorkflowResult(
+                    success=True,
+                    script=scripting_result.script,
+                    usage=total_usage,
+                    upload_skipped=True,
+                    warnings=run_warnings,
+                    prompt_report_path=prompt_report_path,
+                    generation_metadata_path=generation_metadata_path,
+                    images_only=True,
+                    scene_images=images_result.scene_images,
+                    theme=theme,
+                    output_dir=output_base,
+                    segment_bg_generation_time=images_result.segment_bg_generation_time,
+                    visual_identity=scripting_result.visual_identity,
+                )
+
             # ========== Phase 3: 制作（音声合成 → 動画生成） ==========
+            production_kwargs = {"scene_options": scene_options} if scene_options is not None else {}
             production_result = await execute_production_phase(
                 script=scripting_result.script,
                 config=config,
@@ -1582,7 +1760,8 @@ def run_workflow_sync(
                 speed_scale=overrides_obj.speed_scale,
                 segments=scripting_result.segments,  # セグメント情報を渡す
                 visual_identity=scripting_result.visual_identity,  # ビジュアルアイデンティティを渡す
-                callbacks=callbacks
+                callbacks=callbacks,
+                **production_kwargs,
             )
             
             # Usage記録
@@ -1727,6 +1906,7 @@ def run_workflow_sync(
                 warnings=run_warnings,
                 prompt_report_path=prompt_report_path,
                 generation_metadata_path=generation_metadata_path,
+                scene_images=list(getattr(production_result, "scene_images", None) or []),
                 theme=theme,
                 output_dir=output_base,
                 segment_bg_generation_time=segment_bg_time,

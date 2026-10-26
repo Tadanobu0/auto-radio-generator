@@ -16,6 +16,8 @@ class RenderResult:
     segment_bg_generation_time: float = 0.0  # セグメント背景生成時間（秒）
     # タイムライン計算での警告（visuals を捨てた等）。result.json の warnings に載せる（013）
     warnings: list[str] = field(default_factory=list)
+    # 場面ごとの背景画像の一覧（segment_id・画像・プロンプト・seed 等）。result.json の scene_images へ（016）
+    scene_images: list[dict] = field(default_factory=list)
 
 
 class IVideoRenderer(ABC):

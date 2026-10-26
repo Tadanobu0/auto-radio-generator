@@ -17,6 +17,7 @@ from core.models.visual import (
 )
 from services.script_generation.adapters.factory import LLMAdapterFactory
 from services.script_generation.scene_placement_check import find_placement_problem
+from services.script_generation.scene_placement_phrases import short_prompt_placement_phrases
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -416,8 +417,9 @@ Generate the prompt now:"""
 
     SHORT_SCENE_SYSTEM_PROMPT = """You turn a Japanese scene direction for a background picture into ONE plain English sentence that describes only what is in the picture.
 - Keep the same main objects and the same number of units, written as an English word (one, two, three ...)
-- Keep every placement, height and position word as words about the place (e.g. 腰の高さの棚 -> on a waist-height shelf). A height word says where the object stands, never how big it is
-- Describe only what is in the picture. No people and no writing; do not name anything that must not be shown, not even negated
+- Keep every placement, height, position and distance word as words about the place (e.g. 腰の高さの棚 -> on a waist-height shelf; 壁から30cm離す -> about 30 centimeters from the wall). A height word says where the object stands, never how big it is
+- For each "Must not be shown" item, write where the object is instead, stated positively (e.g. 窓際に置かない -> away from the window, toward the middle of the room; 床に置かない -> raised up off the floor)
+- Describe only what is in the picture. No people and no writing; never describe the avoided state itself, not even negated
 - Add no symbol or graphic that the direction does not name (glowing lines or arcs, waves, arrows, Wi-Fi marks)
 - Return only the sentence, under 60 words, with no Japanese and no quotation marks"""
 
@@ -429,7 +431,7 @@ Generate the prompt now:"""
         lines = [f"Point of this scene: {visual.focus}", f"Draw: {visual.draw}"]
         avoid = "; ".join(item.strip() for item in visual.avoid if item.strip())
         if avoid:
-            lines.append(f"Must not be shown (draw the correct opposite instead, without naming it): {avoid}")
+            lines.append(f"Must not be shown (write the correct opposite place positively instead): {avoid}")
         try:
             response = await self._llm_port.generate(LLMRequest(
                 system_prompt=self.SHORT_SCENE_SYSTEM_PROMPT,
@@ -443,9 +445,13 @@ Generate the prompt now:"""
         except Exception as e:
             logger.error(f"Short scene prompt failed for {segment.segment_id}: {e}")
             return None, f"LLM call failed ({type(e).__name__}: {self._short(e)})"
-        sentence = sentence.rstrip(" .")
+        sentence = sentence.rstrip(" .,")
         if not sentence:
             return None, "LLM returned an empty sentence"
+        # The LLM sentence may drop avoid and the placement words; code adds them (016)
+        extra = short_prompt_placement_phrases(visual.draw, visual.avoid, sentence)
+        if extra:
+            sentence = f"{sentence}, {', '.join(extra)}"
         prompt = (
             f"{self.SEGMENT_PROMPT_PREFIX}{sentence}, bathed in {color_palette}, {aesthetic}, "
             f"shot on Kodak Portra 400 film, subtle film grain, highly detailed"

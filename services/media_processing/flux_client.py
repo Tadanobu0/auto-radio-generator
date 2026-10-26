@@ -5,7 +5,7 @@ import json
 import logging
 import tempfile
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import httpx
 from rich.console import Console
@@ -119,8 +119,11 @@ class FluxClient:
         segment_id: str = None,
         segment_type: str = None,
         visual_identity: dict = None,
+        seed: Optional[int] = None,
     ) -> Tuple[Path, GenerationMetadata]:
         """Generate image via Forge API and return metadata
+
+        seed: fixed seed (a regenerated scene, 016); None = random as before.
         
         Args:
             prompt: English prompt for image generation
@@ -146,7 +149,7 @@ class FluxClient:
             "sampler_name": self.sampler_name,
             "scheduler": self.scheduler,
             "cfg_scale": self.cfg_scale,
-            "seed": -1,  # Random seed
+            "seed": -1 if seed is None else int(seed),  # -1 = random seed
             "batch_size": 1,
         }
         

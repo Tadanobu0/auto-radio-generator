@@ -24,6 +24,7 @@ from core.models.curation import ScriptSegment
 from core.models.generation_metadata import GenerationMetadata
 from core.models.visual import VisualIdentity, VisualPalette
 from services.media_processing.prompt_ops_logger import PromptOpsLogger
+from services.media_processing.scene_images import SceneImageOptions, scene_record
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -73,6 +74,11 @@ class ImageProvider:
 
         # Fallbacks (generic / short prompt, static image) per scene, for result.json (014)
         self.warnings: list[str] = []
+
+        # Scene list (segment_id, image, prompt, seed, ...) and reuse / regen options (016).
+        # scene_options is set by the caller after construction (None = as before).
+        self.scene_records: list[dict] = []
+        self.scene_options: Optional[SceneImageOptions] = None
 
         # Scan available static images (always scan for fallback support)
         self._static_images: dict[str, list[Path]] = {}
@@ -145,6 +151,9 @@ class ImageProvider:
         Returns:
             Path: Background image path
         """
+        reused = self._reused_image(segment)
+        if reused is not None:
+            return reused
         if self.mode == "dynamic":
             try:
                 return await self._generate_dynamic_image(segment)
@@ -154,11 +163,49 @@ class ImageProvider:
                 console.print(f"[yellow]⚠ Dynamic generation failed, using static fallback[/yellow]")
                 self._take_prompt_warnings()
                 self._add_static_fallback_warning(segment, e)
-                return self._select_static_image(segment)
+                return self._record_scene(segment, self._select_static_image(segment), None, None, False, "static")
             finally:
                 self._take_prompt_warnings()
         else:
-            return self._select_static_image(segment)
+            return self._record_scene(segment, self._select_static_image(segment), None, None, False, "static")
+
+    def _record_scene(
+        self, segment: ScriptSegment, path: Path, prompt: Optional[str], seed: Optional[int],
+        cached: bool, source: str,
+    ) -> Path:
+        """Keep the scene in self.scene_records (016) and return path; never fails the image."""
+        try:
+            if not isinstance(getattr(self, "scene_records", None), list):
+                self.scene_records = []
+            self.scene_records.append(scene_record(segment, path, prompt, seed, cached, source))
+        except Exception as e:  # the record is a report only
+            logger.warning(f"Scene record for {segment.segment_id} failed (non-fatal): {e}")
+        return path
+
+    def _reused_image(self, segment: ScriptSegment) -> Optional[Path]:
+        """The previous run's image for this scene (reuse_images_from), unless it is to be regenerated."""
+        options = getattr(self, "scene_options", None)
+        if options is None or options.reuse_dir is None or options.is_regen(segment.segment_id):
+            return None
+        entry = options.take_reuse(segment.segment_id)
+        if entry is None or not entry.get("image_path"):
+            if entry is not None:
+                options.warnings.append(
+                    f"scene image for {segment.segment_id} in {options.reuse_dir} is missing; generated as usual"
+                )
+            options.unmatched_ids.append(segment.segment_id)
+            return None
+        path = Path(entry["image_path"])
+        options.reused_ids.append(segment.segment_id)
+        logger.info(f"Reusing scene image for {segment.segment_id}: {path}")
+        console.print(f"[dim]Reusing image of the previous run: {path.name}[/dim]")
+        return self._record_scene(segment, path, entry.get("prompt"), entry.get("seed"), False, "reused")
+
+    def finish_scene_images(self) -> None:
+        """Move the reuse summary (reused / unmatched scenes) into self.warnings (016)."""
+        options = getattr(self, "scene_options", None)
+        if options is not None and options.active:
+            self._warning_list().extend(options.finish())
 
     def _warning_list(self) -> list[str]:
         if not isinstance(getattr(self, "warnings", None), list):
@@ -214,8 +261,18 @@ class ImageProvider:
             # 2. Check cache (prompt-based key)
             cache_key = self._get_prompt_cache_key(prompt)
             cache_path = self.cache_dir / f"{cache_key}.png"
-            
-            if cache_path.exists():
+
+            # A scene in regen_scenes (016) skips the cache and gets a shifted seed;
+            # its file name carries the seed so the cached image is kept as it was
+            seed = None
+            options = getattr(self, "scene_options", None)
+            if options is not None and options.is_regen(segment.segment_id):
+                seed = options.regen_seed(segment.segment_id, options.take_reuse(segment.segment_id))
+                cache_path = self.cache_dir / f"{cache_key}_seed{seed}.png"
+                console.print(f"[cyan]Regenerating {segment.segment_id} with seed {seed}[/cyan]")
+                logger.info(f"Regenerating scene {segment.segment_id} (cache skipped, seed {seed})")
+
+            if seed is None and cache_path.exists():
                 console.print(f"[dim]Using cached image: {cache_path.name}[/dim]")
                 logger.info(f"Cache hit for segment {segment.segment_id}")
                 # Record the prompt even on a cache hit, so the run's report lists every scene (013)
@@ -231,7 +288,7 @@ class ImageProvider:
                         scene_visual=self._scene_visual_dict(segment),
                         cached=True,
                     ))
-                return cache_path
+                return self._record_scene(segment, cache_path, prompt, None, True, "cache")
             
             # 3. Generate image via FluxClient
             try:
@@ -240,7 +297,8 @@ class ImageProvider:
                 # Prepare visual identity dict for metadata
                 vi_dict = self._visual_identity_dict()
 
-                # Generate image with metadata
+                # Generate image with metadata (seed only for a regenerated scene: 016)
+                seed_kwargs = {"seed": seed} if seed is not None else {}
                 image_path, metadata = await self.image_client.generate_image(
                     prompt=prompt,
                     output_path=cache_path,
@@ -248,6 +306,7 @@ class ImageProvider:
                     segment_id=segment.segment_id,
                     segment_type=segment.segment_type,
                     visual_identity=vi_dict,
+                    **seed_kwargs,
                 )
                 
                 console.print(f"[green]✓ Generated: {image_path.name} ({metadata.generation_time_sec:.1f}s)[/green]")
@@ -263,18 +322,20 @@ class ImageProvider:
                 
                 # Update end time for wall-clock tracking
                 self._generation_end_time = time.time()
-                
-                return image_path
-                
+
+                return self._record_scene(
+                    segment, image_path, prompt, getattr(metadata, "seed", seed), False, "generated"
+                )
+
             except Exception as e:
                 # Track time even on failure
                 self._generation_end_time = time.time()
-                
+
                 logger.error(f"Dynamic image generation failed: {e}, falling back to static mode")
                 console.print(f"[yellow]⚠ Generation failed, using static fallback[/yellow]")
                 self._take_prompt_warnings()
                 self._add_static_fallback_warning(segment, e)
-                return self._select_static_image(segment)
+                return self._record_scene(segment, self._select_static_image(segment), prompt, None, False, "static")
     
     def _visual_identity_dict(self) -> dict:
         """Colors and aesthetic of the visual identity, for the prompt records."""

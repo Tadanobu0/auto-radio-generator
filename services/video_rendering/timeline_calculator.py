@@ -157,6 +157,37 @@ class TimelineCalculator:
             "scene_visual": visual,
         })
 
+    def plan_scene_segments(
+        self, segment: ScriptSegment, timing: SegmentTiming
+    ) -> tuple[list[int], list[ScriptSegment]]:
+        """Scene bounds (first turn of each scene + len(turns)) and one segment per scene image.
+
+        Background images: one per scene (a long segment is split at turn starts,
+        each scene's prompt comes from its own turns; see scene_splitter).
+        When the script gives visuals, its start_turns are the cuts and each scene's
+        prompt also gets that scene's SceneVisual (what to draw / not to draw).
+        The images-only run (016) uses this too, so its scene ids match the full run's.
+        """
+        visuals = self._usable_visuals(segment, timing)
+        if visuals:
+            scene_starts = [visual.start_turn for visual in visuals]
+        else:
+            scene_starts = self._plan_scene_starts(segment, timing)
+        scene_bounds = scene_starts + [len(segment.turns)]
+        if len(scene_starts) > 1:
+            scene_segments = [
+                self._scene_segment(
+                    segment, k, scene_bounds[k], scene_bounds[k + 1],
+                    visuals[k] if visuals else None,
+                )
+                for k in range(len(scene_starts))
+            ]
+        elif visuals:
+            scene_segments = [segment.model_copy(update={"scene_visual": visuals[0]})]
+        else:
+            scene_segments = [segment]
+        return scene_bounds, scene_segments
+
     async def calculate_timeline(
         self,
         segments: list[ScriptSegment],
@@ -201,29 +232,10 @@ class TimelineCalculator:
                 )
                 timing = self._estimate_timing(segment, i, len(segments), synthesis_result.total_duration_sec)
             
-            # Background images: one per scene (a long segment is split at turn starts,
-            # each scene's prompt comes from its own turns; see scene_splitter).
-            # When the script gives visuals, its start_turns are the cuts and each scene's
-            # prompt also gets that scene's SceneVisual (what to draw / not to draw).
-            visuals = self._usable_visuals(segment, timing)
-            if visuals:
-                scene_starts = [visual.start_turn for visual in visuals]
-            else:
-                scene_starts = self._plan_scene_starts(segment, timing)
-            scene_bounds = scene_starts + [len(segment.turns)]
-            if len(scene_starts) > 1:
-                scene_images = []
-                for k in range(len(scene_starts)):
-                    scene_segment = self._scene_segment(
-                        segment, k, scene_bounds[k], scene_bounds[k + 1],
-                        visuals[k] if visuals else None,
-                    )
-                    scene_images.append(await image_provider.get_image_for_segment(scene_segment))
-            elif visuals:
-                scene_segment = segment.model_copy(update={"scene_visual": visuals[0]})
-                scene_images = [await image_provider.get_image_for_segment(scene_segment)]
-            else:
-                scene_images = [await image_provider.get_image_for_segment(segment)]
+            scene_bounds, scene_segments = self.plan_scene_segments(segment, timing)
+            scene_images = []
+            for scene_segment in scene_segments:
+                scene_images.append(await image_provider.get_image_for_segment(scene_segment))
             bg_image = scene_images[0]
             scenes = [
                 SceneTimelineEntry(
