@@ -141,6 +141,7 @@ class FfmpegRenderer(IVideoRenderer):
         segments: Optional[list[ScriptSegment]] = None,
         visual_identity: Optional[VisualIdentity] = None,
         prompt_log_dir: Optional[Path] = None,
+        scene_options=None,
     ) -> RenderResult:
         """動画を生成（3フェーズパイプライン）
         
@@ -158,6 +159,8 @@ class FfmpegRenderer(IVideoRenderer):
             segments: スクリプトセグメント（新規、セグメント単位の背景切り替え用）
             prompt_log_dir: 画像プロンプトの記録（prompt_report.md / generation_metadata.jsonl）
                 の置き場所。省略時は動画と同じディレクトリ（013 で run のディレクトリ直下に寄せた）
+            scene_options: 前の run の画像の使い回し・指定場面の作り直し（SceneImageOptions。016）。
+                None なら今までどおり
         """
         # 出力ディレクトリを確保
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,8 +195,10 @@ class FfmpegRenderer(IVideoRenderer):
             # PromptOps logging goes to prompt_log_dir (the run directory), else next to the video
             output_dir = Path(prompt_log_dir) if prompt_log_dir else output_path.parent
             image_provider = ImageProvider(self.config, visual_identity=visual_identity, output_dir=output_dir)
+            if scene_options is not None:
+                image_provider.scene_options = scene_options
             jingle_provider = JingleProvider()
-            
+
             timeline = await self.timeline_calculator.calculate_timeline(
                 segments=segments,
                 synthesis_result=synthesis_result,
@@ -201,7 +206,10 @@ class FfmpegRenderer(IVideoRenderer):
                 jingle_provider=jingle_provider,
                 bgm_path=bgm_file,
             )
-            
+            finish_scene_images = getattr(image_provider, "finish_scene_images", None)
+            if callable(finish_scene_images):
+                finish_scene_images()
+
             console.print(f"[green]✓ タイムライン計算完了: {len(timeline.segments)}セグメント[/green]")
             
             # Get wall-clock time for image generation
@@ -261,6 +269,7 @@ class FfmpegRenderer(IVideoRenderer):
                 file_size_mb=file_size_mb,
                 segment_bg_generation_time=segment_bg_generation_time,
                 warnings=self._collect_warnings(image_provider),
+                scene_images=self._collect_scene_images(image_provider),
             )
         
         except Exception as e:
@@ -269,6 +278,12 @@ class FfmpegRenderer(IVideoRenderer):
             console.print(f"[yellow]中間ファイルを保持（デバッグ用）: {temp_dir}[/yellow]")
             raise
     
+    @staticmethod
+    def _collect_scene_images(image_provider) -> list[dict]:
+        """The image provider's scene list (016); [] if it keeps none."""
+        records = getattr(image_provider, "scene_records", None)
+        return list(records) if isinstance(records, list) else []
+
     def _collect_warnings(self, image_provider) -> list[str]:
         """Warnings for result.json: the timeline's (visuals dropped, 013), then the images' (014)."""
         warnings = list(getattr(self.timeline_calculator, "warnings", None) or [])

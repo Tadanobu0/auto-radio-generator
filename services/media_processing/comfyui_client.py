@@ -6,7 +6,7 @@ import logging
 import random
 import tempfile
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import httpx
 from rich.console import Console
@@ -129,8 +129,11 @@ class ComfyUIClient:
         segment_id: str = None,
         segment_type: str = None,
         visual_identity: dict = None,
+        seed: Optional[int] = None,
     ) -> Tuple[Path, GenerationMetadata]:
         """Generate image via ComfyUI async API and return metadata
+
+        seed: fixed seed (a regenerated scene, 016); None = random as before.
         
         Args:
             prompt: English prompt for image generation
@@ -154,7 +157,9 @@ class ComfyUIClient:
             workflow[self.NODE_IDS["clip_text_pos"]]["inputs"]["text"] = prompt  # Prompt
             workflow[self.NODE_IDS["empty_latent"]]["inputs"]["width"] = self.width
             workflow[self.NODE_IDS["empty_latent"]]["inputs"]["height"] = self.height
-            workflow[self.NODE_IDS["ksampler"]]["inputs"]["seed"] = random.randint(1, 10**15)
+            workflow[self.NODE_IDS["ksampler"]]["inputs"]["seed"] = (
+                random.randint(1, 10**15) if seed is None else int(seed)
+            )
             workflow[self.NODE_IDS["ksampler"]]["inputs"]["steps"] = self.steps
             workflow[self.NODE_IDS["ksampler"]]["inputs"]["cfg"] = self.cfg
             workflow[self.NODE_IDS["ksampler"]]["inputs"]["sampler_name"] = self.sampler_name

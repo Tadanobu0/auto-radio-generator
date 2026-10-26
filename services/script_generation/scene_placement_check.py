@@ -8,6 +8,9 @@ mistakes were seen in the Wi-Fi run (radio_director-019):
 
 find_placement_problem() only flags those two patterns. It never requires a word to be
 present, so a prompt that simply leaves the height out still passes.
+
+Viewpoint wording (016) is not a height of the place: 目の高さから見た in "draw" and
+eye-level view / at eye level / seen from eye level in the prompt are skipped.
 """
 import re
 from typing import Optional
@@ -54,8 +57,40 @@ _LOW_PLACEMENT = [
 _FURNITURE_RE = re.compile(rf"\b(?:{FURNITURE})\b")
 
 
+# Viewpoint wording (016): 目の高さから見た絵 / eye-level view say where the camera is,
+# not how high the object stands. The script's composition rule writes this into "draw",
+# and the humidifier run (radio_director-022) had 5 of 17 scenes rejected for it.
+_DRAW_VIEWPOINT_RE = re.compile(
+    r"(?:目|目線|腰|胸|肩)の高さ(?:から|で(?=見|眺|撮|捉)|の(?=視点|目線|カメラ|構図|アングル|位置から))"
+    r"|(?:目|目線)の高さ視点"
+)
+_PARTS = "eye|waist|chest|shoulder"
+_PROMPT_VIEWPOINT_RES = [
+    # at eye level / seen from eye level / from an eye-height vantage
+    re.compile(rf"\b(?:seen\s+|viewed\s+|shot\s+|photographed\s+|framed\s+|captured\s+|looking\s+)?"
+               rf"(?:from|at)\s+(?:an?\s+|the\s+)?(?:{_PARTS})[- ](?:level|height)\b"),
+    # eye-level view / eye-level frontal shot / eye-height camera
+    re.compile(rf"\b(?:{_PARTS})[- ](?:level|height)\s+(?:[a-z-]+\s+)?"
+               r"(?:view|views|shot|perspective|angle|camera|composition|vantage|framing|photo|photograph|"
+               r"viewpoint|point of view|close-up|wide shot)\b"),
+]
+
+
+def strip_draw_viewpoint(draw: str) -> str:
+    """draw without the viewpoint wording (目の高さから見た ...), so it is not read as a place height."""
+    return _DRAW_VIEWPOINT_RE.sub("", draw)
+
+
+def strip_prompt_viewpoint(text: str) -> str:
+    """Prompt text (lower case) without camera-height wording such as 'eye-level view'."""
+    for pattern in _PROMPT_VIEWPOINT_RES:
+        text = pattern.sub(" ", text)
+    return text
+
+
 def draw_height_parts(draw: str) -> list[str]:
-    """English body parts for the height words in draw (e.g. ["waist"])."""
+    """English body parts for the height words in draw (e.g. ["waist"]); viewpoint words do not count."""
+    draw = strip_draw_viewpoint(draw)
     parts = []
     for word, part in HEIGHT_WORDS.items():
         if word in draw and part not in parts:
@@ -75,7 +110,7 @@ def wants_off_floor(draw: str, avoid: Optional[list[str]] = None) -> bool:
 
 def find_placement_problem(draw: str, avoid: Optional[list[str]], prompt_body: str) -> Optional[str]:
     """A short English reason if the prompt breaks the placement in draw, else None."""
-    text = prompt_body.lower()
+    text = strip_prompt_viewpoint(prompt_body.lower())
     if wants_off_floor(draw, avoid):
         for pattern in _LOW_PLACEMENT:
             match = pattern.search(text)
