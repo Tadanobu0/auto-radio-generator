@@ -1,5 +1,13 @@
 # STATUS
 
+## 画像だけを先に作る実行・場面の作り直し・画像の使い回し、置き場所の検査の誤判定(ブリーフ 016)— 2026-10-27 時点
+- ブランチ `pm/016` に実装済み。main へは未マージ(PM が報告を見てから merge)。Mac 側(render_local.py → radio-render → launch.ps1 → run_remote.py)は別ジョブ
+- 置き場所の検査: draw の「目の高さから見た」とプロンプトの `eye-level view` / `at eye level` / `seen from eye level` 等を高さとみなさない。置き場所の高さ(目の高さの棚)は今までどおり見る
+- 短いプロンプト: LLM の 1 文の後ろに、draw の高さ・距離と avoid の逆の状態(肯定形)をコードで足す(`services/script_generation/scene_placement_phrases.py`)
+- `run_workflow_sync(images_only=True)`: 背景画像までで止める。画像は `<run>/scene_images/NN_<segment_id>.png`、一覧は `<run>/scene_images.json` と `WorkflowResult.scene_images`、result.json 用は `build_scene_images_result_fields(result)`(欄 `scene_images`)
+- `regen_scenes=[...]` / `regen_seed_offset=N`(既定 1): 指定の場面だけキャッシュを使わず seed = 前の seed + N。`reuse_images_from=<前の images_only の run>`: segment_id が合う場面はその画像をそのまま使い、合わない場面・使わなかった画像は warnings に出す
+- arg-remote `test -q`: 867 passed / 8 skipped(skip は試しエンコード)
+
 ## 画像プロンプトの固定文に「機器の表面は無地」を足す(ブリーフ 015)— 2026-10-26 時点
 - ブランチ `pm/015` に実装済み。main へは未マージ(PM が報告を見てから merge)。効き目は merge・deploy 後の /render で見る
 - 背景の前置き: 「An unpopulated, wordless scene with no people, no hands, no faces, no text, signage or labels, plain matte unbranded device surfaces: 」(134 字)。足した語句は否定形なし(2026-10-26 PM 判断)。汎用の文・draw の短い英文にも同じ前置きが付く。サムネイルは変えていない

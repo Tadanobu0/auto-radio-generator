@@ -1,5 +1,16 @@
 # DECISIONS
 
+## 2026-10-27 画像だけ先に作る実行・場面の作り直し・画像の使い回しの受け渡しの形(ブリーフ 016)
+- 決定: `run_workflow_sync` に `images_only` / `regen_scenes` / `regen_seed_offset`(既定 1)/ `reuse_images_from` を足す。images_only は台本の読み込み → 場面の区切り(本番と同じ `TimelineCalculator.plan_scene_segments`)→ 背景画像で止め、画像を `<run>/scene_images/NN_<segment_id>.png` にコピーし、一覧を `<run>/scene_images.json` と `WorkflowResult.scene_images` に入れる。`build_scene_images_result_fields(result)` が result.json の欄 `scene_images` を返す。reuse_images_from はその json を読み、segment_id(重複は出た順)で対応づける。作り直しはキャッシュを使わず、seed = 前の run の seed + offset(不明なら segment_id のハッシュ + offset)。キャッシュの画像は上書きせず `<hash>_seed<N>.png` に書く
+- 理由: segment_id は場面の区切りが同じなら本番と一致する。プロンプトは毎回 LLM が作るのでキャッシュ(プロンプトのハッシュ)では当たらない。seed を決めておけば、作り直した結果が result.json から追える
+- 却下案: 章・場面の番号で対応づける(章の増減でずれる)/ 作り直しも乱数の seed(再現できない)/ 本番の実行でも毎回コピーする(指定が無いときの動きを変えない)
+- 補足: visuals の無い章は、音声を作らないので発話の長さを文字数(8 字/秒 × 話速、間は pause_between_phrases_ms)から見積もって切る。本番と場面の数が変わったら、合わない場面は作り直して warnings に出す。images_only でも前提条件の確認(VOICEVOX・FFmpeg)はそのまま通す
+
+## 2026-10-27 置き場所の検査は視点の言い方を除き、短いプロンプトには avoid の逆と置き場所の語をコードで足す(ブリーフ 016)
+- 決定: draw の「目の高さから / 目の高さで見た / 目の高さの視点」と、プロンプトの `eye-level view` / `at eye level` / `seen from eye level` / `eye-height camera` 等(腰・胸・肩も同じ)を、高さの検査の前に取り除く。短いプロンプト(`_short_scene_prompt`)には、LLM の 1 文の後ろに、draw の高さ(`at waist height`)・距離(`with about 30 centimeters of open space around it`)と、avoid の逆の状態(表で決めた肯定形。例 窓際 → `away from the window, toward the middle of the room`)を、文にまだ無ければ足す
+- 理由: 加湿器の回で外れた 4 場面はすべて短いプロンプトで、LLM の 1 文が avoid と置き場所を落としていた。指示を強めるだけでは同じことが起きうる。表に無い avoid は LLM への指示(肯定形で書く)にだけ頼る
+- 却下案: 短いプロンプトの LLM に任せたまま指示だけ強める / avoid を LLM でもう 1 回英訳する(呼び出しが増え、また落としうる)/ 視点の語を draw から台本側だけで消す(古い台本で同じことが起きる)
+
 ## 2026-10-26 背景の前置きに「plain matte unbranded device surfaces」を足し、前置きの上限を 100 → 134 字に広げる(ブリーフ 015、PM 判断)
 - 決定: `SEGMENT_PROMPT_PREFIX` の末尾に否定形の無い「plain matte unbranded device surfaces」だけを足す(→ 134 字)。007 の既存テスト `test_prefix_is_short_and_has_no_screen` の `len(prefix) <= 100` を、この長さちょうどの `<= 134` に変えた(他の検査はそのまま。PM 了承)。draw にない記号を足させない指示は、visuals の場面の最後の手順(番号の数は変えない)と、draw の短い英文の指示に 1 文ずつ足した。visuals の無い場面・サムネイルは変えない
 - 理由: FLUX schnell は否定の名詞を名詞として読み、「no logos」がロゴを呼ぶおそれがある(2026-10-26 PM 判断)。前置きと本文をつなぐ形(`PREFIX + body`)は多くの既存テストが見ていて、別の定数に分けても落ちるので、上限を広げるのが変更が一番小さい
