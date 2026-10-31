@@ -168,9 +168,8 @@ def test_workflow_no_longer_uses_research_data_topic_for_theme():
     将来のリファクタで誰かが復活させるリグレッション防止。コメント内の言及は許容するため、
     実コード行（インデント直後にこの代入が来るパターン）のみを検出する。
     """
-    src = Path(
-        "E:/windsurf/auto_radio_generator/workflow.py"
-    ).read_text(encoding="utf-8")
+    # 2026-11-01 (017): E:/ 直読みは Mac で落ちる。このテストファイルからの相対で読む
+    src = (Path(__file__).resolve().parent.parent / "workflow.py").read_text(encoding="utf-8")
 
     for line in src.splitlines():
         stripped = line.lstrip()

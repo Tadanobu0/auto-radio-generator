@@ -6,6 +6,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from rich.console import Console
 import json
 
+from services import render_fonts
+
 console = Console()
 
 
@@ -29,6 +31,11 @@ class ThumbnailGenerator:
         Returns:
             list[Path]: 利用可能なフォントパスのリスト（優先順）
         """
+        # ARG_FONT_DIR (017): 字幕と同じ字体。題・日付バッジとも Regular (Meiryo のときと同じ太さの扱い)。
+        # Pillow の size は em の px なので、字体を替えても大きさの数字はそのまま
+        font = render_fonts.active_font()
+        if not font.is_default:
+            return [p for p in (font.regular, font.bold) if p is not None]
         candidates = [
             # Windows標準フォント
             Path("C:/Windows/Fonts/meiryo.ttc"),

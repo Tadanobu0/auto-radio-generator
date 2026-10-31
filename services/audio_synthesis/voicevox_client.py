@@ -17,7 +17,14 @@ from core.interfaces import IAudioSynthesizer, SynthesisResult, ChapterMarker
 from core.models import Script, AppConfig
 from services.media_processing import JingleProvider
 from .voicevox_segment_timing import calculate_segment_timings
-from .subtitle_layout import band_drawing, layout_turn
+from .subtitle_layout import (
+    band_drawing,
+    layout_turn,
+    line_margins_v,
+    subtitle_font_name,
+    subtitle_font_size,
+    uses_line_per_dialogue,
+)
 
 console = Console()
 
@@ -451,7 +458,12 @@ class VoicevoxClient(IAudioSynthesizer):
         Note: 冒頭に2秒の無音が追加されているため、字幕タイミングを2秒オフセット
         """
         pre_roll_offset_ms = 2000  # 冒頭の無音時間
-        
+
+        # 字体 (017): 既定は Meiryo,105。ARG_FONT_DIR があればその字体で、Fontsize は em 70px から出す
+        font_name = subtitle_font_name()
+        font_size = subtitle_font_size()
+        line_per_dialogue = uses_line_per_dialogue()
+
         # ASSヘッダー
         header = """[Script Info]
 Title: Auto Radio Subtitles
@@ -463,14 +475,14 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Main,Meiryo,105,&H0055FF55,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
-Style: Sub,Meiryo,105,&H00FFFFFF,&H000000FF,&H00502080,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
-Style: Band,Meiryo,105,&H60000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: Main,{font},{size},&H0055FF55,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
+Style: Sub,{font},{size},&H00FFFFFF,&H000000FF,&H00502080,&H80000000,0,0,0,0,100,100,0,0,1,6,2,2,80,80,30,1
+Style: Band,{font},{size},&H60000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-        
+""".replace("{font}", font_name).replace("{size}", str(font_size))
+
         lines = [header]
         
         for _, start_ms, end_ms, text, speaker in phrase_data:
@@ -487,8 +499,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             for cue in layout_turn(text, adjusted_start_ms, adjusted_end_ms):
                 start_time = self._ms_to_ass_time(cue.start_ms)
                 end_time = self._ms_to_ass_time(cue.end_ms)
-                wrapped_text = "\\N".join(cue.lines)
                 lines.append(f"Dialogue: 0,{start_time},{end_time},Band,,0,0,0,,{band_drawing(len(cue.lines))}\n")
+                if line_per_dialogue:
+                    # L2 方式: 字体の行送りが詰まる (BIZ UDPGothic は 1.0em) ので、1 行ずつ別の
+                    # Dialogue にして MarginV で Meiryo のときと同じ行の位置に置く
+                    for line_text, margin_v in zip(cue.lines, line_margins_v(len(cue.lines))):
+                        lines.append(
+                            f"Dialogue: 1,{start_time},{end_time},{style},,0,0,{margin_v},,{line_text}\n"
+                        )
+                    continue
+                wrapped_text = "\\N".join(cue.lines)
                 lines.append(f"Dialogue: 1,{start_time},{end_time},{style},,0,0,0,,{wrapped_text}\n")
         
         output_path.write_text("".join(lines), encoding="utf-8")
