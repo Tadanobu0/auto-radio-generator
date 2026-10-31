@@ -44,10 +44,16 @@ _SUBTITLE_COLON = re.compile(r"：\s*|:\s+|[？！?!]\s+")
 _COLONS = "：:"
 
 
-@lru_cache(maxsize=None)
 def _title_measurer(font_size: int) -> sl.Measure:
-    """drawtext の fontsize (= em の px) での描画幅を返す関数。Meiryo が無ければ概算。"""
-    font_path = sl.find_subtitle_font()
+    """drawtext の fontsize (= em の px) での描画幅を返す関数。字体 (既定は Meiryo) が無ければ概算。
+
+    字体は ARG_FONT_DIR に従う (017)。fontsize は em の px なので、字体を替えても同じ数字で同じ字の大きさ。
+    """
+    return _title_measurer_for(sl.find_subtitle_font(), font_size)
+
+
+@lru_cache(maxsize=None)
+def _title_measurer_for(font_path, font_size: int) -> sl.Measure:
     if font_path is not None:
         try:
             from PIL import ImageFont
@@ -124,7 +130,8 @@ def build_title_drawtexts(
 ) -> list[str]:
     """1 章ぶんの drawtext フィルタ (1 行に 1 つ) を返す。"""
     size, lines = layout_title(title)
-    # Meiryo の 1 行の高さは em の約 1.5 倍。行ごとの箱が重ならないよう枠の分も空ける
+    # Meiryo の 1 行の高さは em の約 1.5 倍。行ごとの箱が重ならないよう枠の分も空ける。
+    # 字体を替えても (017) 行の位置は字幕の L2 方式と同じ考えで今の 1.5em 送りを保つ
     line_step = int(round(size * 1.5)) + 2 * TITLE_BOX_BORDER
     return [
         f"drawtext=text='{escape(line)}':expansion=none:"

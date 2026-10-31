@@ -23,13 +23,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
+from services import render_fonts
+
 logger = logging.getLogger(__name__)
 
 # --- ASS スタイルと同じ値 (voicevox_client._generate_ass のヘッダーと揃える) ---
 PLAY_RES_X = 1920
 PLAY_RES_Y = 1080
+# FONT_NAME / FONT_SIZE は既定 (Meiryo) のときの ASS の値。ARG_FONT_DIR で字体を替えたときは
+# subtitle_font_name() / subtitle_font_size() を使う (017)
 FONT_NAME = "Meiryo"
 FONT_SIZE = 105
+# 字の大きさの正 (em の px)。Meiryo 105 は em 70px
+SUBTITLE_EM_PX = 70
+# 字幕の行送り (px)。Meiryo 105 の今の行間。字体を替えても 1 行ずつ別の Dialogue にしてこの間隔を保つ (L2 方式)
+LINE_PITCH_PX = FONT_SIZE
 MARGIN_L = 80
 MARGIN_R = 80
 MARGIN_V = 30
@@ -127,25 +135,74 @@ def _is_ascii_word(ch: str) -> bool:
 # 描画幅の計測
 # ---------------------------------------------------------------------------
 def find_subtitle_font() -> Optional[Path]:
-    """字幕フォント (Meiryo) の実ファイルを返す。無ければ None。"""
+    """字幕フォントの実ファイルを返す。無ければ None。
+
+    ARG_FONT_DIR があればそのフォルダの Regular、無ければ Meiryo (017)。
+    """
+    font = render_fonts.active_font()
+    if not font.is_default:
+        return font.regular
     for candidate in FONT_CANDIDATES:
         if candidate.exists():
             return candidate
     return None
 
 
-def make_font_measurer(font_path: Path, font_size: int = FONT_SIZE) -> Measure:
+def subtitle_font_name() -> str:
+    """ASS の Fontname (既定は Meiryo)。"""
+    return render_fonts.active_font().name
+
+
+def subtitle_font_size() -> int:
+    """ASS の Fontsize。em の px (SUBTITLE_EM_PX) とフォントの寸法から出す (Meiryo → 105)。"""
+    return render_fonts.active_font().ass_font_size(SUBTITLE_EM_PX)
+
+
+def uses_line_per_dialogue() -> bool:
+    """1 行ずつ別の Dialogue にする (L2 方式) か。既定の Meiryo では今までどおり \\N でつなぐ。"""
+    return not render_fonts.active_font().is_default
+
+
+def line_margins_v(n_lines: int) -> list[int]:
+    """L2 方式で、上から k 行目の Dialogue に付ける MarginV の列。
+
+    Meiryo 105 を \\N でつないだときと同じベースラインに各行を置く。libass は 1 行の箱の下端から
+    winDescent だけ上にベースラインを置くので、字体の descent の差を MarginV で埋め、
+    行ごとに LINE_PITCH_PX ずつ上げる。
+    """
+    font = render_fonts.active_font()
+    meiryo_descent = SUBTITLE_EM_PX * render_fonts.MEIRYO_METRICS.descent_em
+    font_descent = SUBTITLE_EM_PX * font.metrics.descent_em
+    return [
+        int(round(MARGIN_V + meiryo_descent - font_descent + (n_lines - 1 - k) * LINE_PITCH_PX))
+        for k in range(n_lines)
+    ]
+
+
+def _em_px_for(font_path: Path, font_size: float) -> float:
+    """ASS の Fontsize を em の px に直す (libass と同じく winAscent + winDescent で割る)。"""
+    try:
+        metrics = render_fonts.read_font_metrics(font_path)
+        return font_size / metrics.ass_height_em
+    except Exception:
+        from PIL import ImageFont
+
+        probe_size = 4096
+        probe = ImageFont.truetype(str(font_path), probe_size, layout_engine=ImageFont.Layout.BASIC)
+        ascent, descent = probe.getmetrics()
+        return font_size * probe_size / (ascent + descent)
+
+
+def make_font_measurer(font_path: Path, font_size: Optional[float] = None) -> Measure:
     """実フォントで描画幅 (px) を返す関数を作る。
 
-    libass は ASS の Fontsize を「アセンダ+ディセンダの高さ」として扱うので、
-    em サイズは font_size * em / (ascender + descender) になる (Meiryo 105 → 70px)。
+    libass は ASS の Fontsize を「アセンダ+ディセンダ (OS/2 の winAscent + winDescent) の高さ」
+    として扱うので、em サイズは font_size * em / (ascender + descender) になる (Meiryo 105 → 70px)。
+    font_size を省くと、字幕の em (SUBTITLE_EM_PX) で測る (どの字体でも画面と同じ大きさ)。
     """
     from PIL import ImageFont
 
-    probe_size = 4096
-    probe = ImageFont.truetype(str(font_path), probe_size, layout_engine=ImageFont.Layout.BASIC)
-    ascent, descent = probe.getmetrics()
-    em_px = font_size * probe_size / (ascent + descent)
+    em_px = SUBTITLE_EM_PX if font_size is None else _em_px_for(font_path, font_size)
     font = ImageFont.truetype(str(font_path), em_px, layout_engine=ImageFont.Layout.BASIC)
 
     @lru_cache(maxsize=65536)
@@ -169,10 +226,13 @@ def estimate_width(text: str, font_size: int = FONT_SIZE) -> float:
     return width
 
 
-@lru_cache(maxsize=1)
 def default_measurer() -> Measure:
-    """本番用の計測関数。Meiryo があれば実測、無ければ概算に落とす。"""
-    font_path = find_subtitle_font()
+    """本番用の計測関数。字幕フォント (既定は Meiryo) があれば実測、無ければ概算に落とす。"""
+    return _measurer_for(find_subtitle_font())
+
+
+@lru_cache(maxsize=4)
+def _measurer_for(font_path: Optional[Path]) -> Measure:
     if font_path is not None:
         try:
             return make_font_measurer(font_path)
@@ -513,8 +573,9 @@ def band_top_y(n_lines: int) -> int:
 
     libass は Fontsize を 1 行の高さ (アセンダ+ディセンダ) として扱うので、
     字幕の上端は 下端 (PLAY_RES_Y - MARGIN_V) から n_lines * FONT_SIZE 上。
+    字体を替えても L2 方式で行送りを LINE_PITCH_PX (= Meiryo の FONT_SIZE) に保つので、帯も同じ位置。
     """
-    return PLAY_RES_Y - MARGIN_V - n_lines * FONT_SIZE - BAND_PAD_PX
+    return PLAY_RES_Y - MARGIN_V - n_lines * LINE_PITCH_PX - BAND_PAD_PX
 
 
 def band_drawing(n_lines: int) -> str:

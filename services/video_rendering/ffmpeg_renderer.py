@@ -17,6 +17,7 @@ from rich.console import Console
 from core.interfaces import ChapterMarker, IVideoRenderer, RenderResult, SynthesisResult
 from core.models import AppConfig, ScriptSegment
 from core.models.visual import VisualIdentity  # Issue #7 fix: Proper type import
+from services import render_fonts
 from services.media_processing import ImageProvider, JingleProvider
 from .timeline_calculator import TimelineCalculator
 from .topic_overlay import build_topic_overlay_filter
@@ -86,7 +87,13 @@ class FfmpegRenderer(IVideoRenderer):
         return escaped
 
     def _get_drawtext_fontfile(self) -> str:
-        """Windowsで利用可能な日本語フォントのfontfile値を返す(字幕と揃えて Meiryo を優先)"""
+        """Windowsで利用可能な日本語フォントのfontfile値を返す(字幕と揃えて Meiryo を優先)
+
+        ARG_FONT_DIR があればその字体 (字幕と同じ) を返す (017)。
+        """
+        font = render_fonts.active_font()
+        if not font.is_default:
+            return self._escape_windows_path(str(font.regular))
         candidates = [
             "C:/Windows/Fonts/meiryo.ttc",
             "C:/Windows/Fonts/msgothic.ttc",
@@ -393,6 +400,10 @@ class FfmpegRenderer(IVideoRenderer):
             console.print(f"[dim]DEBUG: subtitle escaped:  {safe_path}[/dim]")
             
             subtitle_filter = f"subtitles='{safe_path}'"
+            # ARG_FONT_DIR (017): libass にそのフォルダの字体を読ませる
+            fonts_dir = render_fonts.active_font().fonts_dir
+            if fonts_dir is not None:
+                subtitle_filter += f":fontsdir='{self._escape_windows_path(str(fonts_dir))}'"
         else:
             console.print("[yellow]WARNING: Subtitle path not provided or file not found.[/yellow]")
             subtitle_filter = None

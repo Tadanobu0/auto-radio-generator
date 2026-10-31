@@ -20,7 +20,7 @@ numpy>=1.24.0            # 音声データ処理
 
 # Image Processing
 Pillow>=10.0.0           # サムネイル生成
-budoux>=0.6.0            # 日本語の自然な改行
+budoux==0.8.0            # 日本語の自然な改行 (Windows と Mac で字幕の改行を揃えるため固定、017)
 
 # HTTP Client / Web Fetching
 httpx>=0.27.0            # VOICEVOX API通信（非同期対応）

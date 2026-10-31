@@ -17,6 +17,7 @@ from rich.console import Console
 
 from core.models import AppConfig, VideoTimeline
 from core.interfaces import ChapterMarker
+from services import render_fonts
 from .topic_overlay import DATE_FONT_SIZE, DATE_MARGIN_X, DATE_MARGIN_Y, build_topic_overlay_filter
 
 logger = logging.getLogger(__name__)
@@ -443,6 +444,10 @@ class VideoTrackRenderer:
         """
         abs_path = str(subtitle_path.resolve())
         safe_path = self._escape_windows_path(abs_path)
+        # ARG_FONT_DIR (017): libass にそのフォルダの字体を読ませる。既定 (Meiryo) は今までどおり
+        fonts_dir = render_fonts.active_font().fonts_dir
+        if fonts_dir is not None:
+            return f"subtitles='{safe_path}':fontsdir='{self._escape_windows_path(str(fonts_dir))}'"
         return f"subtitles='{safe_path}'"
     
     def _get_drawtext_fontfile(self) -> str:
@@ -451,6 +456,10 @@ class VideoTrackRenderer:
         Returns:
             str: Escaped font file path
         """
+        # ARG_FONT_DIR (017): the configured font (same as the subtitles)
+        font = render_fonts.active_font()
+        if not font.is_default:
+            return self._escape_windows_path(str(font.regular))
         # Meiryo first so the chapter title matches the subtitle font
         candidates = [
             "C:/Windows/Fonts/meiryo.ttc",

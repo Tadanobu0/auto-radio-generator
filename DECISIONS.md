@@ -1,5 +1,20 @@
 # DECISIONS
 
+## 2026-11-01 書き出しは Mac に完全移行し、Windows の書き出し経路は参照用としてだけ残す(ブリーフ 017、PM 判断)
+- 決定: 書き出しは Mac に完全移行する(PM が成功を確信)。Windows の書き出し経路は、移行が済むまでの参照用としてだけ残し、温存のための追加の作り込みはしない。017 の静止画の見比べ(字幕・章タイトル・日付・サムネイル)は PM 判断で合格とし、merge する
+- 理由: BIZ UDPGothic での静止画が Meiryo の本番と見比べて問題なかった。両機で書き出しを保つと、字体・ffmpeg・依存の差を二重に面倒みることになる
+- 却下案: 両機で書き出しを保ち続ける / Windows の経路に Mac と揃えるための作り込みを足す
+
+## 2026-11-01 budoux==0.8.0 の固定は暫定の措置(ブリーフ 017、PM 判断)
+- 決定: `requirements.txt` の `budoux==0.8.0` は、移行中に Windows と Mac で字幕の改行を揃えるための暫定の固定。Mac 移行後に見直す
+- 理由: 書き出しが Mac だけになれば、両機で揃える必要は無くなる
+- 却下案: 恒久の固定にする(更新を止めたままになる)
+
+## 2026-11-01 書き出しの字体は ARG_FONT_DIR で受け、ASS の Fontsize は em の px から出す(ブリーフ 017)
+- 決定: `services/render_fonts.py` に受け口を 1 つ置き、字幕・章タイトル・日付・サムネイルの 4 か所がそこを見る。`ARG_FONT_DIR` が無ければ Meiryo(今までと同じ文字列・同じ挙動)。あればそのフォルダの `BIZUDPGothic-Regular.ttf`(必須。無ければ `RenderFontError` で止める)と `-Bold.ttf`(任意)。ASS の Fontname はファイルの name テーブルの family 名(`ARG_FONT_NAME` で上書き可)。libass には subtitles の `fontsdir` でフォルダを渡す。ASS の Fontsize は em 70px × (usWinAscent + usWinDescent) / unitsPerEm(Meiryo は 1.5 で 105)。drawtext・Pillow はもともと em の px なので数字はそのまま。字幕は字体を替えたときだけ 1 行 1 Dialogue(L2)にし、MarginV で Meiryo を \N でつないだときと同じベースラインに置く(行送り 105px、descent の差を埋める)。帯の位置は変えない。4 か所とも Regular(Meiryo の今の太さの扱いと同じ)
+- 理由: 既存の本番を変えない(Append-Only)。libass は Fontsize を win の高さで解釈するので、em を正にすると字体が替わっても字の大きさが揃う。指定したのに黙って Meiryo に落ちると Mac では豆腐になる
+- 却下案: 字体名と大きさを config.yaml に持つ(Windows と Mac で別の値を持つ必要があり、環境変数の方が機ごとに切りやすい)/ Meiryo でも L2 にする(既存の ASS が変わる)/ Pillow の getmetrics(hhea)で換算(libass は OS/2 の win を使う)/ 字体の行送りのまま \N でつなぐ(BIZ UDPGothic は 1.0em に詰まる。PM 決定で L2)
+
 ## 2026-10-27 画像だけ先に作る実行・場面の作り直し・画像の使い回しの受け渡しの形(ブリーフ 016)
 - 決定: `run_workflow_sync` に `images_only` / `regen_scenes` / `regen_seed_offset`(既定 1)/ `reuse_images_from` を足す。images_only は台本の読み込み → 場面の区切り(本番と同じ `TimelineCalculator.plan_scene_segments`)→ 背景画像で止め、画像を `<run>/scene_images/NN_<segment_id>.png` にコピーし、一覧を `<run>/scene_images.json` と `WorkflowResult.scene_images` に入れる。`build_scene_images_result_fields(result)` が result.json の欄 `scene_images` を返す。reuse_images_from はその json を読み、segment_id(重複は出た順)で対応づける。作り直しはキャッシュを使わず、seed = 前の run の seed + offset(不明なら segment_id のハッシュ + offset)。キャッシュの画像は上書きせず `<hash>_seed<N>.png` に書く
 - 理由: segment_id は場面の区切りが同じなら本番と一致する。プロンプトは毎回 LLM が作るのでキャッシュ(プロンプトのハッシュ)では当たらない。seed を決めておけば、作り直した結果が result.json から追える
