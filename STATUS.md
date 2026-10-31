@@ -1,5 +1,14 @@
 # STATUS
 
+## フォントの受け口 ARG_FONT_DIR と BIZ UDPGothic での書き出し(ブリーフ 017)— 2026-11-01 時点
+- ブランチ `pm/017` に実装済み。main へは未マージ(PM の確認後に merge・Windows へ配備)
+- `services/render_fonts.py`: `ARG_FONT_DIR` が無ければ Meiryo(今までと同じ)。あればそのフォルダの `BIZUDPGothic-Regular.ttf`(必須)/ `-Bold.ttf`(任意)を字幕・章タイトル・日付・サムネイルで使う。ASS の字体名は family 名(`ARG_FONT_NAME` で上書き可)、subtitles に `fontsdir` を付ける
+- 字の大きさは em の px が正: 字幕 em 70px → ASS の Fontsize = 70 × (winAscent+winDescent)/unitsPerEm(Meiryo 105)。章タイトル 80〜56・日付 28・サムネイルは em の px のまま
+- 字体を替えたときの字幕は L2 方式(1 行 1 Dialogue、MarginV で Meiryo と同じベースライン・行送り 105px)。帯の位置は同じ
+- `requirements.txt` の budoux を `==0.8.0` に固定。`test_research_brief_theme_overwrite` の workflow.py を `Path(__file__)` からの相対で読む
+- 見比べの静止画: `scripts/render_font_samples.py`(このジョブでは手元の Python・ffmpeg・~/radio-fonts を使えず、未実行)
+- arg-remote `test -q`: 893 passed / 10 skipped(skip は試しエンコード 8 件と、本物の BIZ UDPGothic が要る 2 件)
+
 ## 画像だけを先に作る実行・場面の作り直し・画像の使い回し、置き場所の検査の誤判定(ブリーフ 016)— 2026-10-27 時点
 - ブランチ `pm/016` に実装済み。main へは未マージ(PM が報告を見てから merge)。Mac 側(render_local.py → radio-render → launch.ps1 → run_remote.py)は別ジョブ
 - 置き場所の検査: draw の「目の高さから見た」とプロンプトの `eye-level view` / `at eye level` / `seen from eye level` 等を高さとみなさない。置き場所の高さ(目の高さの棚)は今までどおり見る
