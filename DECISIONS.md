@@ -1,5 +1,15 @@
 # DECISIONS
 
+## 2026-11-01 書き出しは Mac に完全移行し、Windows の書き出し経路は参照用としてだけ残す(ブリーフ 017、PM 判断)
+- 決定: 書き出しは Mac に完全移行する(PM が成功を確信)。Windows の書き出し経路は、移行が済むまでの参照用としてだけ残し、温存のための追加の作り込みはしない。017 の静止画の見比べ(字幕・章タイトル・日付・サムネイル)は PM 判断で合格とし、merge する
+- 理由: BIZ UDPGothic での静止画が Meiryo の本番と見比べて問題なかった。両機で書き出しを保つと、字体・ffmpeg・依存の差を二重に面倒みることになる
+- 却下案: 両機で書き出しを保ち続ける / Windows の経路に Mac と揃えるための作り込みを足す
+
+## 2026-11-01 budoux==0.8.0 の固定は暫定の措置(ブリーフ 017、PM 判断)
+- 決定: `requirements.txt` の `budoux==0.8.0` は、移行中に Windows と Mac で字幕の改行を揃えるための暫定の固定。Mac 移行後に見直す
+- 理由: 書き出しが Mac だけになれば、両機で揃える必要は無くなる
+- 却下案: 恒久の固定にする(更新を止めたままになる)
+
 ## 2026-11-01 書き出しの字体は ARG_FONT_DIR で受け、ASS の Fontsize は em の px から出す(ブリーフ 017)
 - 決定: `services/render_fonts.py` に受け口を 1 つ置き、字幕・章タイトル・日付・サムネイルの 4 か所がそこを見る。`ARG_FONT_DIR` が無ければ Meiryo(今までと同じ文字列・同じ挙動)。あればそのフォルダの `BIZUDPGothic-Regular.ttf`(必須。無ければ `RenderFontError` で止める)と `-Bold.ttf`(任意)。ASS の Fontname はファイルの name テーブルの family 名(`ARG_FONT_NAME` で上書き可)。libass には subtitles の `fontsdir` でフォルダを渡す。ASS の Fontsize は em 70px × (usWinAscent + usWinDescent) / unitsPerEm(Meiryo は 1.5 で 105)。drawtext・Pillow はもともと em の px なので数字はそのまま。字幕は字体を替えたときだけ 1 行 1 Dialogue(L2)にし、MarginV で Meiryo を \N でつないだときと同じベースラインに置く(行送り 105px、descent の差を埋める)。帯の位置は変えない。4 か所とも Regular(Meiryo の今の太さの扱いと同じ)
 - 理由: 既存の本番を変えない(Append-Only)。libass は Fontsize を win の高さで解釈するので、em を正にすると字体が替わっても字の大きさが揃う。指定したのに黙って Meiryo に落ちると Mac では豆腐になる
