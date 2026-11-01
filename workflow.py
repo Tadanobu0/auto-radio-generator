@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import re
+import shutil
 import sys
 import time
 from dataclasses import dataclass, field
@@ -110,6 +111,8 @@ class WorkflowResult:
     images_only: bool = False
     # 場面ごとの背景画像の一覧（016）。result.json の scene_images へ（build_scene_images_result_fields）
     scene_images: list[dict] = field(default_factory=list)
+    # 画像だけを作る実行で作ったサムネイル背景（018）。<output_dir>/thumbnail_bg.png。作らなかった・失敗したら None
+    thumbnail_bg_path: Optional[Path] = None
     # サムネイル再作成用
     theme: str = ""  # 元のテーマ
     output_dir: Optional[Path] = None  # 出力先ディレクトリ
@@ -1379,6 +1382,60 @@ async def _generate_thumbnail_assets(
     return thumbnail_path, thumbnail_bg_generation_time
 
 
+THUMBNAIL_BG_FILENAME = "thumbnail_bg.png"
+
+
+async def generate_images_only_thumbnail_bg(
+    config: AppConfig,
+    output_base: Path,
+    theme: str,
+    script,
+    visual_identity,
+    callbacks,
+) -> tuple[Optional[Path], float, list[str]]:
+    """画像だけを作る実行（018）で、サムネイル背景 <output_base>/thumbnail_bg.png を作る。
+
+    書き出しは Mac 側（radio_director）がこの画像を --thumbnail-bg で使う。
+    作るかどうかは本番と同じ video_renderer.thumbnail_background_mode で決める（"dynamic" のときだけ）。
+    失敗しても例外は投げず、警告を返す（場面画像の結果は壊さない）。
+
+    Returns:
+        (thumbnail_bg_path or None, generation_time_sec, warnings)
+    """
+    video_config = getattr(config.yaml, "video_renderer", None)
+    mode = getattr(video_config, "thumbnail_background_mode", "static") if video_config else "static"
+    if mode != "dynamic":
+        callbacks.log(f"[INFO] thumbnail_background_mode={mode} のため、サムネイル背景は作りません")
+        return None, 0.0, []
+
+    output_path = Path(output_base) / THUMBNAIL_BG_FILENAME
+    start = time.time()
+    try:
+        callbacks.log("[INFO] サムネイル背景を生成中（画像だけを作る実行）...")
+        description = getattr(script, "description", "") or ""
+        title = getattr(script, "title", None)
+        generator = ThumbnailBackgroundGenerator(config, output_dir=output_base)
+        image_path = await generator.generate(
+            theme=theme,
+            script_summary=description[:300] if description else (theme or title or ""),
+            output_path=output_path,
+            visual_identity=visual_identity,
+            topic_title=title,
+        )
+        image_path = Path(image_path)
+        if not image_path.is_file():
+            raise RuntimeError(f"generated file not found: {image_path}")
+        if image_path.resolve() != output_path.resolve():
+            shutil.copy2(image_path, output_path)
+        elapsed = time.time() - start
+        callbacks.log(f"✓ サムネイル背景: {output_path} ({elapsed:.1f}秒)")
+        return output_path, elapsed, []
+    except Exception as e:
+        message = f"thumbnail background generation failed (scene images are kept): {e}"
+        callbacks.log(f"[WARN] {message}")
+        return None, time.time() - start, [message]
+
+
 def run_workflow_sync(
     theme: str,
     overrides: Optional[UIOverrides] = None,
@@ -1722,6 +1779,17 @@ def run_workflow_sync(
                 )
                 run_warnings = list(getattr(external_phase_result, "warnings", None) or [])
                 run_warnings += list(images_result.warnings)
+                # サムネイル背景も作る（018）。失敗しても警告だけにして場面画像の結果は返す
+                thumbnail_bg_path, thumbnail_bg_time, thumbnail_bg_warnings = await generate_images_only_thumbnail_bg(
+                    config=config,
+                    output_base=output_base,
+                    theme=theme,
+                    script=scripting_result.script,
+                    visual_identity=scripting_result.visual_identity,
+                    callbacks=callbacks,
+                )
+                run_warnings += thumbnail_bg_warnings
+                total_usage.thumbnail_bg_generation_time = thumbnail_bg_time
                 prompt_report_path, generation_metadata_path = find_prompt_logs(output_base)
                 total_usage.segment_bg_generation_time = images_result.segment_bg_generation_time
                 total_usage.total_duration_sec = time.time() - workflow_start
@@ -1744,9 +1812,11 @@ def run_workflow_sync(
                     generation_metadata_path=generation_metadata_path,
                     images_only=True,
                     scene_images=images_result.scene_images,
+                    thumbnail_bg_path=thumbnail_bg_path,
                     theme=theme,
                     output_dir=output_base,
                     segment_bg_generation_time=images_result.segment_bg_generation_time,
+                    thumbnail_bg_generation_time=thumbnail_bg_time,
                     visual_identity=scripting_result.visual_identity,
                 )
 
