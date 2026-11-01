@@ -497,6 +497,74 @@ def test_load_reading_fixes_errors(tmp_path):
     assert load_reading_fixes(good).table == {"Wi-Fi": "ワイファイ"}
 
 
+# radio_director の config/reading_fixes.json の形 (PM 指示、radio_director-054)
+RD_FIXES = {
+    "version": 1,
+    "note": "合成に渡す文だけを直す",
+    "fixes": [
+        {
+            "id": "atai",
+            "pattern": r"(?<![一-龥])値(?=[はがをにでのもと]|$)",
+            "replace": "あたい",
+            "reading": "アタイ",
+            "note": "数値・値段には当てない",
+        },
+        {"id": "wifi", "pattern": r"Wi-?Fi", "replace": "わいふぁい", "reading": "ワイファイ"},
+    ],
+}
+
+
+def test_radio_director_regex_shape():
+    fixes = parse_reading_fixes(RD_FIXES)
+    assert [r.id for r in fixes.rules] == ["atai", "wifi"]
+    assert fixes.table == {}
+    assert len(fixes) == 2
+    # 正規表現として当てる: 前後読みで「数値」「値段」には当たらない。reading (カタカナ) は使わない
+    assert fixes.apply("値は大きい。数値と値段の値") == "あたいは大きい。数値と値段のあたい"
+    assert fixes.apply("WiFi と Wi-Fi") == "わいふぁい と わいふぁい"
+    assert fixes.applied_count == 4
+
+
+def test_radio_director_shape_from_file_and_in_synthesis(mock_app_config, tmp_path, monkeypatch):
+    path = tmp_path / "reading_fixes.json"
+    path.write_text(json.dumps(RD_FIXES, ensure_ascii=False), encoding="utf-8")
+    fixes = load_reading_fixes(path)
+    queries, subtitles = _synthesize(mock_app_config, tmp_path, monkeypatch, fixes)
+    assert queries == ["わいふぁい の 5GHz は速いのだ", "そうね。"]
+    assert subtitles[0] == "Wi-Fi の 5GHz は速いのだ[src=1]"  # 字幕は本文のまま
+
+
+def test_regex_rules_and_words_can_be_mixed():
+    fixes = parse_reading_fixes({"fixes": [
+        {"pattern": "値(?=は)", "replace": "あたい"},
+        {"word": "BLE", "reading": "ビーエルイー"},
+    ]})
+    assert fixes.apply("値は BLE") == "あたいは ビーエルイー"
+
+
+@pytest.mark.parametrize(
+    "rule, message",
+    [
+        ({"pattern": "値(", "replace": "あたい"}, "invalid pattern"),
+        ({"pattern": "", "replace": "あたい"}, "non-empty"),
+        ({"pattern": "値*", "replace": "あたい"}, "empty string"),
+        ({"pattern": "(?=値)", "replace": "あたい"}, None),  # 空文字には当たらないので通る
+        ({"pattern": "(値)", "replace": r"\1です"}, "backreference"),
+        ({"pattern": "(?P<v>値)", "replace": r"\g<v>"}, "backreference"),
+        ({"pattern": "値", "replace": r"\q"}, "invalid replace"),
+        ({"pattern": "値"}, "replace must be a string"),
+        ({"pattern": 1, "replace": "あたい"}, "non-empty"),
+    ],
+)
+def test_regex_rule_checks(rule, message):
+    data = {"version": 1, "fixes": [dict(rule, id="r1")]}
+    if message is None:
+        assert len(parse_reading_fixes(data).rules) == 1
+        return
+    with pytest.raises(ReadingFixesError, match=message):
+        parse_reading_fixes(data)
+
+
 def _wav_bytes() -> bytes:
     buf = BytesIO()
     with wave.open(buf, "wb") as w:
