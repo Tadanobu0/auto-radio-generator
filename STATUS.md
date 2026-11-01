@@ -1,5 +1,12 @@
 # STATUS
 
+## 画像だけを作る実行でサムネイル背景も作る(ブリーフ 018)— 2026-11-01 時点
+- ブランチ `pm/018` に実装済み。main へは未マージ(PM が報告を見てから merge)
+- `run_workflow_sync(images_only=True)` は、場面画像の後に `<run の出力ディレクトリ>/thumbnail_bg.png`(= `scene_images/`・`scene_images.json` と同じ階層)を作る。`thumbnail_background_mode: dynamic` のときだけ。パスは `WorkflowResult.thumbnail_bg_path`(作らなかった・失敗は None)
+- 失敗したら `warnings` に `thumbnail background generation failed (scene images are kept): ...` を足し、場面画像の結果はそのまま返す
+- 本番の実行(images_only でない)は変えていない
+- テスト: `tests/test_images_only_thumbnail_bg_018.py`(5 件)を足した。このジョブではテストを実行できなかった(未実行)
+
 ## フォントの受け口 ARG_FONT_DIR と BIZ UDPGothic での書き出し(ブリーフ 017)— 2026-11-01 時点
 - ブランチ `pm/017` に実装済み。静止画の見比べは PM 判断で合格(2026-11-01)、merge 待ち
 - 方針(PM 判断): 書き出しは Mac に完全移行する。Windows の書き出し経路は移行が済むまでの参照用で、温存の作り込みはしない。budoux==0.8.0 の固定は暫定で、Mac 移行後に見直す

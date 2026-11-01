@@ -110,7 +110,7 @@ def test_images_only_static_mode_makes_no_thumbnail_bg(thumb_workflow, monkeypat
     assert _FakeThumbnailBgGenerator.instances == []
     assert result.thumbnail_bg_path is None
     assert not (result.output_dir / "thumbnail_bg.png").exists()
-    assert result.warnings == [w for w in result.warnings if "thumbnail" not in w]
+    assert not any("thumbnail" in w for w in result.warnings)
 
 
 def test_full_run_does_not_use_the_images_only_path(thumb_workflow):
