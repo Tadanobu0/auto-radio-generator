@@ -1,5 +1,13 @@
 # DECISIONS
 
+## 2026-11-01 Mac 書き出しの 4 つの差し替えを run_workflow_sync の引数(と環境変数)で受ける(ブリーフ 019)
+- 決定: `run_workflow_sync` に `reuse_strict: bool = False` / `thumbnail_bg: str|None` / `youtube_dir: str|None` / `reading_fixes: str|None` を足す。引数が無いときだけ環境変数 `ARG_REUSE_STRICT`(1/true/yes/on)/ `ARG_THUMBNAIL_BG` / `ARG_YOUTUBE_DIR` / `ARG_READING_FIXES` を見る。指定したファイル・フォルダが無い・読めないときは、合成の前に `success=False` で止める。result.json 用の欄は `build_mac_render_result_fields(result)`
+- reuse_strict: `reuse_images_from` が要る。合成の前に `plan_scene_ids`(images_only と同じ区切り)で場面を見積もり、使い回しの画像が無い場面(regen_scenes は除く)があれば止める(stage `before_synthesis`)。見積もりで漏れた場面は、本番の画像の段で `ImageProvider._reused_image` が `ReuseStrictError` を投げて止める(stage `render`。合成の後・画像を作る前)。余った画像(この run で使わなかった画像)は今までどおり warnings だけ
+- youtube_dir: `YouTubeClient(config, credentials_dir=...)` がそのフォルダの client_secret.json / token.json を使い、token が無い・更新できないときはブラウザの同意に進まず `YouTubeAuthError`。アップロードの失敗が非致命なのは今までと同じで、理由は `WorkflowResult.upload_error`
+- reading_fixes: 合成に渡す文(`_synthesize_phrase` の中、引用タグを外した後)だけを置き換える。長い語から 1 回だけ置き換え、置き換えた後の文をもう一度置き換えない。字幕は本文のまま
+- 理由: run_remote.py は run_workflow_sync を直接呼ぶので、引数なら名前が変わると TypeError で気づける。環境変数は 012 と同じ流儀で、起動側だけで切り替えたいときのため
+- 却下案: config.yaml に持つ(Windows と Mac で値を分けにくい)/ 環境変数だけ(綴りの誤りで黙って既定に戻る)/ reuse_strict を合成の後の確認だけにする(ブリーフの「合成の前に止めたい」に合わない)
+
 ## 2026-11-01 画像だけを作る実行のサムネイル背景は、本番と同じ thumbnail_background_mode に従う(ブリーフ 018)
 - 決定: `images_only=True` のとき、場面画像の後に `generate_images_only_thumbnail_bg` で `<run の出力ディレクトリ>/thumbnail_bg.png` を作る。作るのは `video_renderer.thumbnail_background_mode == "dynamic"` のときだけ(config.yaml の本番値は dynamic)。失敗は例外にせず `WorkflowResult.warnings` に 1 行足し、場面画像の結果はそのまま返す。パスは `WorkflowResult.thumbnail_bg_path`
 - 理由: 本番の実行(`_generate_thumbnail_assets`)と同じ設定で同じ動きにそろう。static にしている環境では FLUX の時間を使わず、Mac 側は今までどおり静的背景になる。本番経路の関数は既存テストがスタブにしているので触らず、別の関数を足した

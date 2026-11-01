@@ -24,7 +24,7 @@ from core.models.curation import ScriptSegment
 from core.models.generation_metadata import GenerationMetadata
 from core.models.visual import VisualIdentity, VisualPalette
 from services.media_processing.prompt_ops_logger import PromptOpsLogger
-from services.media_processing.scene_images import SceneImageOptions, scene_record
+from services.media_processing.scene_images import ReuseStrictError, SceneImageOptions, scene_record
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -189,6 +189,9 @@ class ImageProvider:
             return None
         entry = options.take_reuse(segment.segment_id)
         if entry is None or not entry.get("image_path"):
+            if getattr(options, "strict", False):
+                # reuse_strict (019): stop here, before any image of this run is generated
+                raise ReuseStrictError([segment.segment_id], options.reuse_dir, "render")
             if entry is not None:
                 options.warnings.append(
                     f"scene image for {segment.segment_id} in {options.reuse_dir} is missing; generated as usual"

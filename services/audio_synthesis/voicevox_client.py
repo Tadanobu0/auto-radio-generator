@@ -53,8 +53,10 @@ class VoicevoxClient(IAudioSynthesizer):
     ローカルで起動しているVOICEVOXエンジンに接続します。
     """
     
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, reading_fixes=None):
         super().__init__(config)
+        # 読みの置き換え表 (019, ReadingFixes)。None なら今までどおり台本の文のまま合成する
+        self.reading_fixes = reading_fixes
         self.base_url = config.env.voicevox_base_url
         self.speakers = config.yaml.audio_synthesizer.speakers
         self.audio_config = config.yaml.audio_synthesizer
@@ -274,6 +276,10 @@ class VoicevoxClient(IAudioSynthesizer):
         """１フレーズの音声を合成"""
         # verified_script.json の [src=N] 引用タグは音読対象外。VOICEVOX 直前で除去。
         text = strip_citation_tags(text)
+        # 読みの置き換え (019): 合成に渡す文だけを直す。字幕 (phrase_data の line.text) は本文のまま
+        reading_fixes = getattr(self, "reading_fixes", None)
+        if reading_fixes is not None:
+            text = reading_fixes.apply(text)
 
         # 音声クエリを生成
         query_response = await client.post(

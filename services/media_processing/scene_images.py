@@ -46,6 +46,23 @@ def base_seed_for(segment_id: str) -> int:
     return int(hashlib.sha256((segment_id or "").encode("utf-8")).hexdigest()[:8], 16) % (2 ** 31)
 
 
+class ReuseStrictError(RuntimeError):
+    """reuse_strict (019): a scene has no reusable image, so the run stops instead of generating one.
+
+    stage is "before_synthesis" (the check before VOICEVOX) or "render" (a scene id that only
+    showed up with the real audio timing; no image has been generated at that point either).
+    """
+
+    def __init__(self, missing_ids: list[str], reuse_dir: Optional[Path], stage: str):
+        self.missing_ids = list(missing_ids)
+        self.reuse_dir = reuse_dir
+        self.stage = stage
+        super().__init__(
+            f"reuse_strict: no reusable image in {reuse_dir} for {len(self.missing_ids)} scene(s)"
+            f" ({stage}): {', '.join(self.missing_ids)}"
+        )
+
+
 @dataclass
 class SceneImageOptions:
     """What the run does with scene images; the defaults change nothing."""
@@ -53,6 +70,9 @@ class SceneImageOptions:
     regen_scenes: set[str] = field(default_factory=set)
     regen_seed_offset: int = DEFAULT_REGEN_SEED_OFFSET
     reuse_dir: Optional[Path] = None
+    # reuse_strict (019): a scene that is not in regen_scenes and has no reusable image
+    # fails the run (ReuseStrictError) instead of being generated
+    strict: bool = False
     # segment_id -> entries of the previous run, in order (duplicate ids are matched in order)
     reuse_entries: dict[str, list[dict]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -72,6 +92,25 @@ class SceneImageOptions:
         if not entries:
             return None
         return entries.pop(0)
+
+    def missing_for(self, segment_ids: Iterable[str]) -> list[str]:
+        """Scenes (in order) that would not get a reusable image; nothing is consumed (019).
+
+        Scenes in regen_scenes are not missing (they are generated on purpose).
+        A duplicate id needs as many usable entries as it appears.
+        """
+        taken: dict[str, int] = {}
+        missing = []
+        for sid in segment_ids:
+            if self.is_regen(sid):
+                continue
+            entries = self.reuse_entries.get(sid) or []
+            k = taken.get(sid, 0)
+            taken[sid] = k + 1
+            # the k-th appearance takes the k-th entry, as take_reuse does
+            if k >= len(entries) or not entries[k].get("image_path"):
+                missing.append(sid)
+        return missing
 
     def regen_seed(self, segment_id: str, previous: Optional[dict]) -> int:
         """Seed for a regenerated scene: the previous seed (or a fixed one) plus the offset."""
@@ -109,11 +148,18 @@ def build_scene_image_options(
     regen_scenes: Optional[Iterable[str]] = None,
     regen_seed_offset: Optional[int] = None,
     reuse_images_from: Optional[str | Path] = None,
+    reuse_strict: bool = False,
 ) -> SceneImageOptions:
-    """Options from run_workflow_sync's arguments. A missing or broken manifest is a ValueError."""
+    """Options from run_workflow_sync's arguments. A missing or broken manifest is a ValueError.
+
+    reuse_strict (019) needs reuse_images_from (ValueError otherwise).
+    """
+    if reuse_strict and not reuse_images_from:
+        raise ValueError("reuse_strict: reuse_images_from is required (no previous run to take images from)")
     options = SceneImageOptions(
         regen_scenes={str(s).strip() for s in (regen_scenes or []) if str(s).strip()},
         regen_seed_offset=DEFAULT_REGEN_SEED_OFFSET if regen_seed_offset is None else int(regen_seed_offset),
+        strict=bool(reuse_strict),
     )
     if reuse_images_from:
         run_dir = Path(reuse_images_from)
