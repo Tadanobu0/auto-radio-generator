@@ -113,6 +113,15 @@ class WorkflowResult:
     scene_images: list[dict] = field(default_factory=list)
     # 画像だけを作る実行で作ったサムネイル背景（018）。<output_dir>/thumbnail_bg.png。作らなかった・失敗したら None
     thumbnail_bg_path: Optional[Path] = None
+    # Mac 書き出しの受け口（019）。build_mac_render_result_fields で result.json へ
+    reuse_strict: bool = False  # 使い回しの画像が足りなければ止める実行だったか
+    reuse_strict_failed: bool = False  # 足りなくて止めたか（このとき success=False）
+    reuse_strict_stage: Optional[str] = None  # "before_synthesis"（合成の前）/ "render"（合成の後・画像を作る前）
+    missing_scene_images: list[str] = field(default_factory=list)  # 使い回しの画像が無かった場面の segment_id
+    thumbnail_bg_source: Optional[str] = None  # 渡した画像を使ったときのそのパス（thumbnail_bg）
+    reading_fixes_path: Optional[Path] = None  # 読みの置き換え表のパス
+    reading_fixes_applied: int = 0  # 合成に渡す文で置き換えた回数
+    upload_error: Optional[str] = None  # アップロードに失敗したときの理由（youtube_dir の token 無しなど）
     # サムネイル再作成用
     theme: str = ""  # 元のテーマ
     output_dir: Optional[Path] = None  # 出力先ディレクトリ
@@ -552,8 +561,11 @@ async def execute_production_phase(
     visual_identity: Optional[VisualIdentity] = None,
     callbacks: Optional[ProgressCallback] = None,
     scene_options=None,
+    reading_fixes=None,
 ) -> ProductionPhaseResult:
     """制作フェーズ: 音声合成 → 動画生成
+
+    reading_fixes（019）: 読みの置き換え表（ReadingFixes）。合成に渡す文だけを直す。
     
     Args:
         script: 台本データ（台本作成フェーズの出力）
@@ -579,7 +591,11 @@ async def execute_production_phase(
     audio_start = time.time()
     audio_output_dir = output_dir / "audio"
     
-    voicevox = VoicevoxClient(config)
+    if reading_fixes is not None:
+        cb.log(f"読みの置き換え表: {getattr(reading_fixes, 'source', None)}（{len(reading_fixes)} 語）")
+        voicevox = VoicevoxClient(config, reading_fixes=reading_fixes)
+    else:
+        voicevox = VoicevoxClient(config)
     synthesis_result = await voicevox.synthesize(
         script, 
         audio_output_dir, 
@@ -1076,6 +1092,106 @@ def build_prompt_log_result_fields(result: "WorkflowResult") -> dict:
     }
 
 
+# Mac 書き出しの受け口（ブリーフ 019）。run_workflow_sync の引数が正で、引数が無いときだけ
+# 環境変数を見る。どれも指定が無ければ今までどおりに動く。
+REUSE_STRICT_ENV = "ARG_REUSE_STRICT"     # "1" / "true" / "yes" / "on" で reuse_strict
+THUMBNAIL_BG_ENV = "ARG_THUMBNAIL_BG"     # サムネイル背景に使う画像のパス
+YOUTUBE_DIR_ENV = "ARG_YOUTUBE_DIR"       # client_secret.json / token.json の置き場
+READING_FIXES_ENV = "ARG_READING_FIXES"   # 読みの置き換え表（JSON）のパス
+
+
+def _env_path(name: str, environ: Optional[dict] = None) -> Optional[str]:
+    env = os.environ if environ is None else environ
+    value = str(env.get(name, "") or "").strip()
+    return value or None
+
+
+def resolve_mac_render_options(
+    reuse_strict: bool = False,
+    thumbnail_bg: Optional[str] = None,
+    youtube_dir: Optional[str] = None,
+    reading_fixes: Optional[str] = None,
+    environ: Optional[dict] = None,
+) -> dict:
+    """引数と環境変数から 019 の 4 つの指定を決める（引数があれば引数）。
+
+    Returns:
+        {"reuse_strict": bool, "thumbnail_bg": Path|None, "youtube_dir": Path|None,
+         "reading_fixes": Path|None}
+    """
+    env = os.environ if environ is None else environ
+    strict = bool(reuse_strict) or str(env.get(REUSE_STRICT_ENV, "")).strip().lower() in _TRUTHY
+    thumb = thumbnail_bg if thumbnail_bg else _env_path(THUMBNAIL_BG_ENV, env)
+    ydir = youtube_dir if youtube_dir else _env_path(YOUTUBE_DIR_ENV, env)
+    fixes = reading_fixes if reading_fixes else _env_path(READING_FIXES_ENV, env)
+    return {
+        "reuse_strict": strict,
+        "thumbnail_bg": Path(thumb) if thumb else None,
+        "youtube_dir": Path(ydir) if ydir else None,
+        "reading_fixes": Path(fixes) if fixes else None,
+    }
+
+
+def plan_scene_ids(segments: Optional[list], config: AppConfig, speed_scale: Optional[float] = None) -> list[str]:
+    """合成の前に、場面の segment_id を本番の順に見積もる（019 の reuse_strict の事前確認）。
+
+    画像だけを作る実行（016）と同じ区切り方。visuals がある章は台本の start_turn で切るので
+    本番と同じ id になる。visuals の無い章は発話の長さを文字数から見積もるため、
+    本番（実際の音声の長さ）と場面の数が変わることがある（そのときは本番の画像の段で止まる）。
+    """
+    from core.interfaces import SegmentTiming
+    from services.media_processing.scene_images import estimate_turn_times
+    from services.video_rendering.timeline_calculator import TimelineCalculator
+
+    calculator = TimelineCalculator(config)
+    calculator.warnings = []
+    audio_config = getattr(config.yaml, "audio_synthesizer", None)
+    if speed_scale is None:
+        speed_scale = getattr(audio_config, "speed_scale", 1.0)
+    speed_scale = float(speed_scale or 1.0)
+    pause_sec = float(getattr(audio_config, "pause_between_phrases_ms", 500) or 0) / 1000.0
+
+    ids: list[str] = []
+    start_sec = 0.0
+    for segment in list(segments or []):
+        starts, end = estimate_turn_times(list(segment.turns or []), speed_scale, pause_sec)
+        timing = SegmentTiming(
+            segment_id=segment.segment_id,
+            segment_type=segment.segment_type,
+            topic_title=segment.topic_title,
+            start_sec=start_sec,
+            end_sec=start_sec + end,
+            duration_sec=end,
+            turn_start_secs=[start_sec + s for s in starts],
+        )
+        _, scene_segments = calculator.plan_scene_segments(segment, timing)
+        ids.extend(s.segment_id for s in scene_segments)
+        start_sec = timing.end_sec + pause_sec
+    return ids
+
+
+def build_mac_render_result_fields(result: "WorkflowResult") -> dict:
+    """result.json に足す、Mac 書き出しの受け口（019）の欄を返す。
+
+    - reuse_strict / reuse_strict_failed / reuse_strict_stage / missing_scene_images:
+      使い回しの画像が足りずに止めたか。止めたときは success=False で、stage は
+      "before_synthesis"（合成の前に分かった）か "render"（合成の後・画像を作る前に分かった）
+    - thumbnail_bg_source: thumbnail_bg で渡した画像（使わなかったら None）
+    - reading_fixes_path / reading_fixes_applied: 読みの置き換え表と置き換えた回数
+    - upload_error: アップロードに失敗した理由（失敗していなければ None）
+    """
+    return {
+        "reuse_strict": bool(result.reuse_strict),
+        "reuse_strict_failed": bool(result.reuse_strict_failed),
+        "reuse_strict_stage": result.reuse_strict_stage,
+        "missing_scene_images": list(result.missing_scene_images or []),
+        "thumbnail_bg_source": str(result.thumbnail_bg_source) if result.thumbnail_bg_source else None,
+        "reading_fixes_path": str(result.reading_fixes_path) if result.reading_fixes_path else None,
+        "reading_fixes_applied": int(result.reading_fixes_applied or 0),
+        "upload_error": result.upload_error,
+    }
+
+
 def build_scene_images_result_fields(result: "WorkflowResult") -> dict:
     """result.json に足す、場面ごとの背景画像の一覧の欄を返す（016）。
 
@@ -1098,8 +1214,14 @@ def _upload_to_youtube(
     formatted_description: str,
     thumbnail_path,
     callbacks,
+    youtube_dir: Optional[Path] = None,
+    errors: Optional[list] = None,
 ) -> Optional[str]:
     """YouTube へ動画をアップロードし、アップロード URL を返す（失敗時は None）。
+
+    youtube_dir（019）: 認証ファイルの置き場。指定すると YouTubeClient はそこを読み、
+    token が無ければブラウザの同意に進まず失敗する（非致命なのは今までと同じ）。
+    errors（019）: 渡されたら、アップロードの失敗の理由をここに足す。
 
     should_upload の判定（UI 優先フラグ / config 設定 / mock ガード）、アップロード、
     再生リスト追加までを担う。アップロード失敗・再生リスト追加失敗はいずれも非致命で、
@@ -1142,7 +1264,11 @@ def _upload_to_youtube(
             )
         callbacks.log("[INFO] YouTubeアップロードを開始します...")
         try:
-            youtube_client = YouTubeClient(config)
+            if youtube_dir is not None:
+                callbacks.log(f"[INFO] YouTube の認証ファイルの置き場: {youtube_dir}（ブラウザの同意には進みません）")
+                youtube_client = YouTubeClient(config, credentials_dir=youtube_dir)
+            else:
+                youtube_client = YouTubeClient(config)
             uploaded_video_url = youtube_client.upload_video(
                 file_path=video_path,
                 title=formatted_title,
@@ -1181,6 +1307,8 @@ def _upload_to_youtube(
             callbacks.log(
                 f"⚠ YouTubeアップロードに失敗しました（動画生成は成功）: {upload_error}"
             )
+            if errors is not None:
+                errors.append(f"{type(upload_error).__name__}: {upload_error}")
     else:
         callbacks.log("[INFO] YouTubeアップロード設定: 無効（UI設定優先）")
 
@@ -1309,8 +1437,12 @@ async def _generate_thumbnail_assets(
     generated_metadata: dict,
     skip_thumbnail_in_mock: bool,
     callbacks,
+    thumbnail_bg_override: Optional[Path] = None,
 ) -> tuple[Path, float]:
     """サムネイル背景(FLUX.1 dynamic / static フォールバック)と thumbnail.png を生成する。
+
+    thumbnail_bg_override（019）: 渡されたら背景は作らず、その画像を
+    <output_base>/thumbnail_bg.png にコピーして使う（thumbnail_background_mode に依らない）。
 
     dynamic モードで FLUX.1 生成に失敗した場合は静的背景へフォールバックする。例外の
     握り方・ログ出力・フォールバック条件は原コードと厳密一致（本運用 1 本目で踏んだ経路）。
@@ -1335,7 +1467,9 @@ async def _generate_thumbnail_assets(
     thumbnail_bg_mode = getattr(video_config, "thumbnail_background_mode", "static") if video_config else "static"
     thumbnail_bg_generation_time = 0.0
 
-    if thumbnail_bg_mode == "dynamic":
+    if thumbnail_bg_override is not None:
+        background_image = _use_given_thumbnail_bg(Path(thumbnail_bg_override), output_base, callbacks)
+    elif thumbnail_bg_mode == "dynamic":
         try:
             callbacks.log("[INFO] サムネイル背景を動的生成中（FLUX.1）...")
             thumbnail_bg_start = time.time()
@@ -1383,6 +1517,22 @@ async def _generate_thumbnail_assets(
 
 
 THUMBNAIL_BG_FILENAME = "thumbnail_bg.png"
+
+
+def _use_given_thumbnail_bg(source: Path, output_base: Path, callbacks) -> Path:
+    """渡されたサムネイル背景を <output_base>/thumbnail_bg.png にコピーして返す（019）。
+
+    コピーできなければ元の画像をそのまま使う。
+    """
+    target = Path(output_base) / THUMBNAIL_BG_FILENAME
+    try:
+        if source.resolve() != target.resolve():
+            shutil.copy2(source, target)
+        callbacks.log(f"[INFO] サムネイル背景は作らず、渡された画像を使います: {source}")
+        return target
+    except Exception as e:
+        callbacks.log(f"⚠ サムネイル背景のコピーに失敗したため、元の画像をそのまま使います: {source} ({e})")
+        return source
 
 
 async def generate_images_only_thumbnail_bg(
@@ -1452,6 +1602,10 @@ def run_workflow_sync(
     regen_scenes: Optional[List[str]] = None,
     regen_seed_offset: Optional[int] = None,
     reuse_images_from: Optional[str] = None,
+    reuse_strict: bool = False,
+    thumbnail_bg: Optional[str] = None,
+    youtube_dir: Optional[str] = None,
+    reading_fixes: Optional[str] = None,
 ) -> WorkflowResult:
     """同期版ワークフロー実行（Gradio から呼び出し用 / 外部台本モード前提）
 
@@ -1484,6 +1638,19 @@ def run_workflow_sync(
         reuse_images_from: 前の images_only の run の出力ディレクトリ。その run の
             scene_images.json を読み、segment_id が合う場面はその画像をそのまま使う。
             合わない場面は今までどおり作り、どちらも warnings に残す（016）
+        reuse_strict: True なら、reuse_images_from に画像が無い場面（regen_scenes を除く）が
+            あるとき、画像を作らずに success=False で止める。合成の前に場面を見積もって確かめ、
+            見積もりで漏れた場面も本番の画像の段（画像を作る前）で止める。
+            reuse_images_from が要る。環境変数 ARG_REUSE_STRICT=1 でも同じ（019）
+        thumbnail_bg: サムネイル背景に使う画像のパス。指定するとサムネイル背景は作らず、
+            その画像を <run>/thumbnail_bg.png にコピーして使う。環境変数 ARG_THUMBNAIL_BG（019）
+        youtube_dir: YouTube の認証ファイル（client_secret.json / token.json）の置き場。
+            指定するとそこを読み、token が無ければブラウザの同意に進まずアップロードを失敗にする
+            （動画は成功のまま。理由は WorkflowResult.upload_error）。環境変数 ARG_YOUTUBE_DIR（019）
+        reading_fixes: 読みの置き換え表（JSON: 語 → かな書き）のパス。合成に渡す文だけを
+            置き換え、字幕は本文のまま。環境変数 ARG_READING_FIXES（019）
+        どれも、指定が無ければ今までどおりに動く。指定したファイル・フォルダが無い・読めない
+        ときは、合成の前に success=False で止まる。
 
     Returns:
         WorkflowResult: 実行結果（Usage/Cost情報含む）
@@ -1547,20 +1714,58 @@ def run_workflow_sync(
             callbacks.log(f"出力ディレクトリ: {output_base}")
 
             # 場面の画像の使い回し・作り直し（016）。指定が無ければ None（今までどおり）
+            # Mac 書き出しの受け口（019）。指定が無ければどれも None / False（今までどおり）
+            mac_options = resolve_mac_render_options(
+                reuse_strict=reuse_strict,
+                thumbnail_bg=thumbnail_bg,
+                youtube_dir=youtube_dir,
+                reading_fixes=reading_fixes,
+            )
+            strict_requested = mac_options["reuse_strict"]
+            thumbnail_bg_override = mac_options["thumbnail_bg"]
+            youtube_dir_path = mac_options["youtube_dir"]
+            reading_fixes_path = mac_options["reading_fixes"]
+            reading_fixes_table = None
+            try:
+                if thumbnail_bg_override is not None and not thumbnail_bg_override.is_file():
+                    raise ValueError(f"thumbnail_bg: {thumbnail_bg_override} not found")
+                if youtube_dir_path is not None and not youtube_dir_path.is_dir():
+                    raise ValueError(f"youtube_dir: {youtube_dir_path} is not a directory")
+                if reading_fixes_path is not None:
+                    from services.audio_synthesis.reading_fixes import load_reading_fixes
+                    reading_fixes_table = load_reading_fixes(reading_fixes_path)
+            except ValueError as _e:
+                callbacks.log(f"❌ {_e}")
+                if log_writer:
+                    log_writer.finalize()
+                return WorkflowResult(
+                    success=False, error_message=str(_e), output_dir=output_base, reuse_strict=strict_requested,
+                )
+            if thumbnail_bg_override is not None:
+                callbacks.log(f"サムネイル背景は渡された画像を使います: {thumbnail_bg_override}")
+            if reading_fixes_table is not None:
+                callbacks.log(f"読みの置き換え表: {reading_fixes_path}（{len(reading_fixes_table)} 語）")
+
             scene_options = None
-            if regen_scenes or reuse_images_from:
+            if regen_scenes or reuse_images_from or strict_requested:
                 from services.media_processing.scene_images import build_scene_image_options
                 try:
                     scene_options = build_scene_image_options(
                         regen_scenes=regen_scenes,
                         regen_seed_offset=regen_seed_offset,
                         reuse_images_from=reuse_images_from,
+                        **({"reuse_strict": True} if strict_requested else {}),
                     )
                 except ValueError as _e:
                     callbacks.log(f"❌ {_e}")
                     if log_writer:
                         log_writer.finalize()
-                    return WorkflowResult(success=False, error_message=str(_e), output_dir=output_base)
+                    return WorkflowResult(
+                        success=False, error_message=str(_e), output_dir=output_base,
+                        reuse_strict=strict_requested,
+                    )
+                if strict_requested:
+                    callbacks.log("使い回しの画像が足りない場面があれば、画像を作らずに止めます（reuse_strict）")
                 if scene_options.reuse_dir is not None:
                     callbacks.log(f"前の run の画像を使い回します: {scene_options.reuse_dir}")
                 if scene_options.regen_scenes:
@@ -1766,17 +1971,51 @@ def run_workflow_sync(
             total_usage.research_duration_sec = scripting_result.research_duration_sec
             total_usage.script_duration_sec = scripting_result.script_duration_sec
 
+            def _reuse_strict_failure(err) -> WorkflowResult:
+                callbacks.log(f"❌ {err}")
+                callbacks.log("使い回しの画像が足りないため、画像を作らずに止めました（reuse_strict）")
+                if log_writer:
+                    log_writer.finalize()
+                return WorkflowResult(
+                    success=False,
+                    error_message=str(err),
+                    script=scripting_result.script,
+                    theme=theme,
+                    output_dir=output_base,
+                    warnings=list(getattr(external_phase_result, "warnings", None) or []),
+                    reuse_strict=True,
+                    reuse_strict_failed=True,
+                    reuse_strict_stage=err.stage,
+                    missing_scene_images=list(err.missing_ids),
+                    images_only=bool(images_only),
+                )
+
+            # ========== 使い回しの画像の事前確認（019 reuse_strict）: 合成の前に止める ==========
+            if scene_options is not None and getattr(scene_options, "strict", False):
+                from services.media_processing.scene_images import ReuseStrictError
+                planned_ids = plan_scene_ids(scripting_result.segments, config, overrides_obj.speed_scale)
+                missing_ids = scene_options.missing_for(planned_ids)
+                if missing_ids:
+                    return _reuse_strict_failure(
+                        ReuseStrictError(missing_ids, scene_options.reuse_dir, "before_synthesis")
+                    )
+                callbacks.log(f"✓ 使い回しの画像は {len(planned_ids)} 場面ぶん揃っています（見積もり）")
+
             # ========== 画像だけを作る実行（016）: 背景画像までで止める ==========
             if images_only:
-                images_result = await execute_images_only_phase(
-                    segments=scripting_result.segments,
-                    config=config,
-                    output_dir=output_base,
-                    speed_scale=overrides_obj.speed_scale,
-                    visual_identity=scripting_result.visual_identity,
-                    scene_options=scene_options,
-                    callbacks=callbacks,
-                )
+                from services.media_processing.scene_images import ReuseStrictError
+                try:
+                    images_result = await execute_images_only_phase(
+                        segments=scripting_result.segments,
+                        config=config,
+                        output_dir=output_base,
+                        speed_scale=overrides_obj.speed_scale,
+                        visual_identity=scripting_result.visual_identity,
+                        scene_options=scene_options,
+                        callbacks=callbacks,
+                    )
+                except ReuseStrictError as _strict_error:
+                    return _reuse_strict_failure(_strict_error)
                 run_warnings = list(getattr(external_phase_result, "warnings", None) or [])
                 run_warnings += list(images_result.warnings)
                 # サムネイル背景も作る（018）。失敗しても警告だけにして場面画像の結果は返す
@@ -1811,6 +2050,7 @@ def run_workflow_sync(
                     prompt_report_path=prompt_report_path,
                     generation_metadata_path=generation_metadata_path,
                     images_only=True,
+                    reuse_strict=strict_requested,
                     scene_images=images_result.scene_images,
                     thumbnail_bg_path=thumbnail_bg_path,
                     theme=theme,
@@ -1822,17 +2062,23 @@ def run_workflow_sync(
 
             # ========== Phase 3: 制作（音声合成 → 動画生成） ==========
             production_kwargs = {"scene_options": scene_options} if scene_options is not None else {}
-            production_result = await execute_production_phase(
-                script=scripting_result.script,
-                config=config,
-                output_dir=output_base,
-                project_root=PROJECT_ROOT,
-                speed_scale=overrides_obj.speed_scale,
-                segments=scripting_result.segments,  # セグメント情報を渡す
-                visual_identity=scripting_result.visual_identity,  # ビジュアルアイデンティティを渡す
-                callbacks=callbacks,
-                **production_kwargs,
-            )
+            if reading_fixes_table is not None:
+                production_kwargs["reading_fixes"] = reading_fixes_table
+            from services.media_processing.scene_images import ReuseStrictError
+            try:
+                production_result = await execute_production_phase(
+                    script=scripting_result.script,
+                    config=config,
+                    output_dir=output_base,
+                    project_root=PROJECT_ROOT,
+                    speed_scale=overrides_obj.speed_scale,
+                    segments=scripting_result.segments,  # セグメント情報を渡す
+                    visual_identity=scripting_result.visual_identity,  # ビジュアルアイデンティティを渡す
+                    callbacks=callbacks,
+                    **production_kwargs,
+                )
+            except ReuseStrictError as _strict_error:
+                return _reuse_strict_failure(_strict_error)
             
             # Usage記録
             total_usage.voicevox = production_result.voicevox_usage
@@ -1871,6 +2117,7 @@ def run_workflow_sync(
                 generated_metadata=generated_metadata,
                 skip_thumbnail_in_mock=skip_thumbnail_in_mock,
                 callbacks=callbacks,
+                **({"thumbnail_bg_override": thumbnail_bg_override} if thumbnail_bg_override is not None else {}),
             )
             total_usage.thumbnail_bg_generation_time = thumbnail_bg_generation_time
 
@@ -1907,6 +2154,7 @@ def run_workflow_sync(
             # YouTubeアップロード（失敗しても動画生成結果は成功扱い）
             # アップロードしない実行では公開だけを飛ばす（012）
             upload_skipped = bool(skip_upload or no_upload_requested())
+            upload_errors: list[str] = []
             if upload_skipped:
                 uploaded_video_url = None
                 callbacks.log(
@@ -1924,6 +2172,8 @@ def run_workflow_sync(
                     formatted_description=formatted_description,
                     thumbnail_path=thumbnail_path,
                     callbacks=callbacks,
+                    errors=upload_errors,
+                    **({"youtube_dir": youtube_dir_path} if youtube_dir_path is not None else {}),
                 )
 
             # ========== 実行ログ・コスト履歴の記録 ==========
@@ -1973,6 +2223,11 @@ def run_workflow_sync(
                 formatted_description=formatted_description,
                 uploaded_video_url=uploaded_video_url,
                 upload_skipped=upload_skipped,
+                upload_error=upload_errors[0] if upload_errors else None,
+                reuse_strict=strict_requested,
+                thumbnail_bg_source=str(thumbnail_bg_override) if thumbnail_bg_override is not None else None,
+                reading_fixes_path=reading_fixes_path if reading_fixes_table is not None else None,
+                reading_fixes_applied=reading_fixes_table.applied_count if reading_fixes_table is not None else 0,
                 warnings=run_warnings,
                 prompt_report_path=prompt_report_path,
                 generation_metadata_path=generation_metadata_path,

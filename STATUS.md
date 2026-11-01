@@ -1,5 +1,15 @@
 # STATUS
 
+## Mac 書き出し用の正式な受け口(ブリーフ 019)— 2026-11-01 時点
+- ブランチ `pm/019` に実装済み。main へは未マージ(PM が報告を見てから merge)。radio_director 側の置き換えは別ジョブ(対応表は `.pm/reports/019.md`)
+- `run_workflow_sync` の引数(引数が無いときは環境変数)。どれも指定が無ければ今までどおり
+  - `reuse_strict=True` / `ARG_REUSE_STRICT=1`: 使い回しの画像が足りなければ止める。合成の前に見積もりで確かめ(`before_synthesis`)、漏れは画像を作る前に止める(`render`)。`reuse_images_from` が要る
+  - `thumbnail_bg=<画像>` / `ARG_THUMBNAIL_BG`: サムネイル背景を作らず、その画像を `<run>/thumbnail_bg.png` にコピーして使う
+  - `youtube_dir=<フォルダ>` / `ARG_YOUTUBE_DIR`: そのフォルダの client_secret.json / token.json を使い、token が無ければブラウザに進まず失敗(非致命。`upload_error`)
+  - `reading_fixes=<JSON>` / `ARG_READING_FIXES`: 合成に渡す文だけを置き換える。字幕は本文のまま。radio_director の `config/reading_fixes.json`(`fixes` 配列の `pattern` 正規表現 → `replace` ひらがな)を並び順に re.sub する。語 → かなの字面の表も受ける
+- result.json 用: `build_mac_render_result_fields(result)`(reuse_strict / reuse_strict_failed / reuse_strict_stage / missing_scene_images / thumbnail_bg_source / reading_fixes_path / reading_fixes_applied / upload_error)
+- テスト: `tests/test_mac_render_inputs_019.py`(47 件)。最初の 35 件は PM が Mac で流して全通過(全体 912 passed / 1 failed は既知の hugging-face / 30 skipped)。正規表現の形の追加 12 件は未実行(merge 前に PM が Mac で流す)
+
 ## 画像だけを作る実行でサムネイル背景も作る(ブリーフ 018)— 2026-11-01 時点
 - ブランチ `pm/018` に実装済み。main へは未マージ(PM が報告を見てから merge)
 - `run_workflow_sync(images_only=True)` は、場面画像の後に `<run の出力ディレクトリ>/thumbnail_bg.png`(= `scene_images/`・`scene_images.json` と同じ階層)を作る。`thumbnail_background_mode: dynamic` のときだけ。パスは `WorkflowResult.thumbnail_bg_path`(作らなかった・失敗は None)

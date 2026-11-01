@@ -14,6 +14,17 @@ from googleapiclient.http import MediaFileUpload
 from core.models import AppConfig
 
 
+CLIENT_SECRET_FILENAME = "client_secret.json"
+TOKEN_FILENAME = "token.json"
+
+
+class YouTubeAuthError(RuntimeError):
+    """認証ファイルの置き場を指定した実行で、token が無い・使えないとき（019）。
+
+    ブラウザの同意画面には進まない（Mac の書き出しは無人で動くため）。
+    """
+
+
 class YouTubeClient:
     """YouTube への動画アップロードを担当するクライアント。"""
 
@@ -22,11 +33,21 @@ class YouTubeClient:
         "https://www.googleapis.com/auth/youtube",
     ]
 
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, credentials_dir: Optional[Path] = None):
+        """
+        Args:
+            credentials_dir: 認証ファイル（client_secret.json / token.json）の置き場（019）。
+                None なら今までどおりプロジェクト直下を使い、token が無ければブラウザで同意する。
+                指定すると、そのフォルダのファイルを使い、token が無い・更新できないときは
+                ブラウザに進まず YouTubeAuthError にする。
+        """
         self.config = config
         self.project_root = config.project_root
-        self.client_secret_path = self.project_root / "client_secret.json"
-        self.token_path = self.project_root / "token.json"
+        self.credentials_dir = Path(credentials_dir) if credentials_dir is not None else None
+        base = self.credentials_dir if self.credentials_dir is not None else self.project_root
+        self.client_secret_path = base / CLIENT_SECRET_FILENAME
+        self.token_path = base / TOKEN_FILENAME
+        self.allow_browser_auth = self.credentials_dir is None
 
         publishing = getattr(config.yaml, "publishing", None)
         self.privacy_status = (
@@ -39,6 +60,12 @@ class YouTubeClient:
     def _get_credentials(self) -> Credentials:
         """OAuth2 認証情報を取得（token 再利用 + 必要時ブラウザ認証）。"""
         creds: Optional[Credentials] = None
+        allow_browser = getattr(self, "allow_browser_auth", True)
+
+        if not allow_browser and not self.token_path.exists():
+            raise YouTubeAuthError(
+                f"token.json が見つかりません（ブラウザの同意には進みません）: {self.token_path}"
+            )
 
         if self.token_path.exists():
             creds = Credentials.from_authorized_user_file(
@@ -53,6 +80,12 @@ class YouTubeClient:
             creds.refresh(Request())
             self.token_path.write_text(creds.to_json(), encoding="utf-8")
             return creds
+
+        if not allow_browser:
+            raise YouTubeAuthError(
+                "token.json が使えません（期限切れで refresh_token が無い・権限が合わない）。"
+                f"ブラウザの同意には進みません: {self.token_path}"
+            )
 
         if not self.client_secret_path.exists():
             raise FileNotFoundError(
