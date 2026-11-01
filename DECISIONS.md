@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-11-01 画像だけを作る実行のサムネイル背景は、本番と同じ thumbnail_background_mode に従う(ブリーフ 018)
+- 決定: `images_only=True` のとき、場面画像の後に `generate_images_only_thumbnail_bg` で `<run の出力ディレクトリ>/thumbnail_bg.png` を作る。作るのは `video_renderer.thumbnail_background_mode == "dynamic"` のときだけ(config.yaml の本番値は dynamic)。失敗は例外にせず `WorkflowResult.warnings` に 1 行足し、場面画像の結果はそのまま返す。パスは `WorkflowResult.thumbnail_bg_path`
+- 理由: 本番の実行(`_generate_thumbnail_assets`)と同じ設定で同じ動きにそろう。static にしている環境では FLUX の時間を使わず、Mac 側は今までどおり静的背景になる。本番経路の関数は既存テストがスタブにしているので触らず、別の関数を足した
+- 却下案: 設定に関係なく images_only では必ず作る(static の意図を無視する)/ `_generate_thumbnail_assets` を流用する(thumbnail.png とメタデータが要り、静的背景へのフォールバックも images_only では不要)
+
 ## 2026-11-01 書き出しは Mac に完全移行し、Windows の書き出し経路は参照用としてだけ残す(ブリーフ 017、PM 判断)
 - 決定: 書き出しは Mac に完全移行する(PM が成功を確信)。Windows の書き出し経路は、移行が済むまでの参照用としてだけ残し、温存のための追加の作り込みはしない。017 の静止画の見比べ(字幕・章タイトル・日付・サムネイル)は PM 判断で合格とし、merge する
 - 理由: BIZ UDPGothic での静止画が Meiryo の本番と見比べて問題なかった。両機で書き出しを保つと、字体・ffmpeg・依存の差を二重に面倒みることになる
