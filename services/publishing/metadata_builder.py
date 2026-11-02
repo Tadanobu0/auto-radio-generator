@@ -7,6 +7,7 @@ from typing import List
 from urllib.parse import urlparse
 
 from services.publishing.text_sanitizer import sanitize_for_youtube, validate_chapter_format
+from services.publishing.text_sanitizer import is_hex_only_title, strip_angle_brackets
 from core.models.research import ResearchSource
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,12 @@ def format_reference_label(ref: ReferenceEntry, idx: int) -> str:
         環状オリゴ糖の脂質吸収抑制効果(example.com、2026-06-28)
     """
     if isinstance(ref, ResearchSource):
-        title = (ref.title or "").strip() or f"参考文献{idx}"
+        raw_title = (ref.title or "").strip()
+        # 2026-11-02: 題が <16 進> だけ (PDF の内部名) なら題を出さない。
+        # それ以外も < > は YouTube が拒否するので落とす (radio_director 側と同じ)
+        if is_hex_only_title(raw_title):
+            raw_title = ""
+        title = strip_angle_brackets(raw_title).strip() or f"参考文献{idx}"
         url = (ref.url or "").strip()
         published = (getattr(ref, "published_date", None) or "").strip()
     else:

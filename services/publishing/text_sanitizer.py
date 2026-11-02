@@ -28,6 +28,27 @@ CHAPTER_PROBLEMATIC = re.compile(
     r']'
 )
 
+# YouTube はタイトル・概要欄の半角 < > を受け付けない (invalidTitle / invalidDescription)。
+# 2026-11-02: 参考文献の題に PDF の内部名 <4D6963…> が入り、概要欄が拒否された。
+# 既存の制御文字・URL と同じく「落とす」で揃える (radio_director 側も同じ)。
+ANGLE_BRACKETS = re.compile(r'[<>]')
+
+# PDF の内部名など、題が <16 進> だけのもの (例: <4D6963726F736F6674>)
+HEX_ONLY_TITLE = re.compile(r'^\s*<\s*[0-9A-Fa-f]+\s*>\s*$')
+
+
+def strip_angle_brackets(text: str) -> str:
+    """半角の < > を取り除く (YouTube のタイトル・概要欄で拒否されるため)。"""
+    if not text:
+        return text or ""
+    return ANGLE_BRACKETS.sub('', text)
+
+
+def is_hex_only_title(title: str) -> bool:
+    """題が <16 進> だけ (PDF の内部名) なら True。"""
+    return bool(title) and bool(HEX_ONLY_TITLE.match(title))
+
+
 # 許可する絵文字（YouTubeで安全に表示されるもの）
 ALLOWED_EMOJIS = {'📄', '🔗', '🎵', '🎬', '📝', '🎯', '🎪', '🎭'}
 
@@ -59,7 +80,10 @@ def sanitize_for_youtube(text: str, max_length: int = 5000) -> str:
     
     # 制御文字を削除
     text = CONTROL_CHARS.sub('', text)
-    
+
+    # 半角 < > を削除 (YouTube が invalidDescription / invalidTitle で拒否する)
+    text = strip_angle_brackets(text)
+
     # 長さ制限
     if len(text) > max_length:
         # 参考文献セクションを優先的に切り詰め

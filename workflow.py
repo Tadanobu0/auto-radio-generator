@@ -44,6 +44,7 @@ from services.publishing.metadata_builder import (
     strip_urls,
 )
 from services.publishing.text_sanitizer import validate_url, normalize_url
+from services.publishing.text_sanitizer import strip_angle_brackets
 from core.models.research import ResearchSource
 from services.execution_logger import ExecutionLogger
 
@@ -898,6 +899,8 @@ def _build_publish_fields(
     # 日付入りタイトルを生成（AI生成タイトル + 日付）
     ai_title = generated_metadata.get("title", script.title)
     formatted_title = f"{ai_title} ({creation_date}制作)"
+    # 2026-11-02: YouTube はタイトルの半角 < > も拒否する (invalidTitle)
+    formatted_title = strip_angle_brackets(formatted_title)
 
     publishing_config = getattr(config.yaml, "publishing", None)
     chapter_lines = _format_chapter_lines(chapters)
@@ -1262,6 +1265,12 @@ def _upload_to_youtube(
                 f"⚠ 概要欄に URL が {len(removed_urls)} 件残っていたため取り除いてアップロードします: "
                 f"{removed_urls}"
             )
+        # 保険: 半角 < > は YouTube が invalidTitle / invalidDescription で拒否する (2026-11-02)
+        guarded_title = strip_angle_brackets(formatted_title)
+        guarded_description = strip_angle_brackets(formatted_description)
+        if guarded_title != formatted_title or guarded_description != formatted_description:
+            callbacks.log("⚠ タイトル/概要欄に < > が残っていたため取り除いてアップロードします")
+        formatted_title, formatted_description = guarded_title, guarded_description
         callbacks.log("[INFO] YouTubeアップロードを開始します...")
         try:
             if youtube_dir is not None:

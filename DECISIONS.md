@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-11-02 タイトル・概要欄の半角 < > は全角に置き換えず「落とす」(ブリーフ 020)
+- 決定: `sanitize_for_youtube` で半角 `<` `>` を削除する(`strip_angle_brackets`)。参考文献の題が `<16 進>` だけ(PDF の内部名)なら題を出さず「参考文献N(ドメイン)」にする(`is_hex_only_title`。`format_reference_label` の中なので概要欄と metadata.txt の両方に効く)。動画タイトル(`_build_publish_fields` の `formatted_title`)と、アップロード直前の保険(`_upload_to_youtube`)でも同じく落とす。全角 ＜ ＞ は触らない
+- 理由: 既存の処理(制御文字・URL)は「落とす」流儀で、radio_director 側(phase_d/metadata_generator.resolve_references)も落としている。両経路で同じ見た目にそろう。題の中の < > は「<速報>」のような囲みが多く、外しても読める
+- 却下案: 全角 ＜ ＞ に置き換える(radio_director 経路と表記がずれる。PDF 内部名の残りが目立つ)/ 参考文献の題だけ直す(Discord /run などで概要文・タイトルに入ったときに同じ失敗が起きる)
+
 ## 2026-11-01 Mac 書き出しの 4 つの差し替えを run_workflow_sync の引数(と環境変数)で受ける(ブリーフ 019)
 - 決定: `run_workflow_sync` に `reuse_strict: bool = False` / `thumbnail_bg: str|None` / `youtube_dir: str|None` / `reading_fixes: str|None` を足す。引数が無いときだけ環境変数 `ARG_REUSE_STRICT`(1/true/yes/on)/ `ARG_THUMBNAIL_BG` / `ARG_YOUTUBE_DIR` / `ARG_READING_FIXES` を見る。指定したファイル・フォルダが無い・読めないときは、合成の前に `success=False` で止める。result.json 用の欄は `build_mac_render_result_fields(result)`
 - reuse_strict: `reuse_images_from` が要る。合成の前に `plan_scene_ids`(images_only と同じ区切り)で場面を見積もり、使い回しの画像が無い場面(regen_scenes は除く)があれば止める(stage `before_synthesis`)。見積もりで漏れた場面は、本番の画像の段で `ImageProvider._reused_image` が `ReuseStrictError` を投げて止める(stage `render`。合成の後・画像を作る前)。余った画像(この run で使わなかった画像)は今までどおり warnings だけ
