@@ -114,6 +114,11 @@ class WorkflowResult:
     scene_images: list[dict] = field(default_factory=list)
     # 画像だけを作る実行で作ったサムネイル背景（018）。<output_dir>/thumbnail_bg.png。作らなかった・失敗したら None
     thumbnail_bg_path: Optional[Path] = None
+    # 候補（021）。build_image_candidates_result_fields で result.json へ
+    image_candidates: int = 1  # 1 場面あたりの候補数（images_only の candidates）
+    thumbnail_bg_candidates: list[dict] = field(default_factory=list)  # サムネイル背景の候補
+    thumbnail_bg_contact_sheet: Optional[Path] = None  # サムネイル背景の一覧画像
+    thumbnail_bg_pick: Optional[int] = None  # picks の thumbnail で使った候補番号
     # Mac 書き出しの受け口（019）。build_mac_render_result_fields で result.json へ
     reuse_strict: bool = False  # 使い回しの画像が足りなければ止める実行だったか
     reuse_strict_failed: bool = False  # 足りなくて止めたか（このとき success=False）
@@ -725,8 +730,9 @@ async def execute_images_only_phase(
         cb.progress(0.20 + 0.75 * (i + 1) / max(1, len(segment_list)), f"🖼️ 背景画像 {i + 1}/{len(segment_list)} 章")
 
     provider.finish_scene_images()
-    exported = export_scene_images(provider.scene_records, output_dir)
-    warnings = list(calculator.warnings) + list(provider.warnings)
+    export_warnings: list[str] = []
+    exported = export_scene_images(provider.scene_records, output_dir, export_warnings)
+    warnings = list(calculator.warnings) + list(provider.warnings) + export_warnings
     for message in warnings:
         cb.log(f"[WARN] {message}")
     cb.log(f"✓ 背景画像 {len(exported)} 枚: {Path(output_dir) / 'scene_images'}")
@@ -1206,6 +1212,55 @@ def build_scene_images_result_fields(result: "WorkflowResult") -> dict:
     return {"scene_images": [dict(entry) for entry in (result.scene_images or [])]}
 
 
+def build_image_candidates_result_fields(result: "WorkflowResult") -> dict:
+    """result.json に足す、候補（021）の欄を返す。
+
+    - image_candidates: 1 場面あたりの候補数（指定が無ければ 1）
+    - thumbnail_bg_candidates / thumbnail_bg_contact_sheet: サムネイル背景の候補と一覧画像
+    - thumbnail_bg_pick: picks の thumbnail で本番に使った候補番号（使っていなければ None）
+    - image_generation_times: 1 枚ごとの生成時間（秒）の集計。この実行で実際に作った候補
+      （キャッシュ・使い回しは除く）だけを数える。
+      {"count", "total_sec", "mean_sec", "min_sec", "max_sec",
+       "per_image": [{"segment_id", "index", "seed", "generation_time_sec"}, ...]}
+      場面の候補ごとの値は scene_images の各要素の candidates[].generation_time_sec にもある。
+    """
+    per_image = []
+    for entry in result.scene_images or []:
+        if entry.get("source") == "reused":
+            continue
+        for cand in entry.get("candidates") or []:
+            if cand.get("image_path") and not cand.get("cached"):
+                per_image.append({
+                    "segment_id": entry.get("segment_id"),
+                    "index": cand.get("index"),
+                    "seed": cand.get("seed"),
+                    "generation_time_sec": float(cand.get("generation_time_sec") or 0.0),
+                })
+    for cand in result.thumbnail_bg_candidates or []:
+        if cand.get("image_path") and not cand.get("cached") and not cand.get("reused"):
+            per_image.append({
+                "segment_id": "thumbnail",
+                "index": cand.get("index"),
+                "seed": cand.get("seed"),
+                "generation_time_sec": float(cand.get("generation_time_sec") or 0.0),
+            })
+    times = [item["generation_time_sec"] for item in per_image]
+    return {
+        "image_candidates": int(result.image_candidates or 1),
+        "thumbnail_bg_candidates": [dict(c) for c in (result.thumbnail_bg_candidates or [])],
+        "thumbnail_bg_contact_sheet": str(result.thumbnail_bg_contact_sheet) if result.thumbnail_bg_contact_sheet else None,
+        "thumbnail_bg_pick": result.thumbnail_bg_pick,
+        "image_generation_times": {
+            "count": len(times),
+            "total_sec": round(sum(times), 3),
+            "mean_sec": round(sum(times) / len(times), 3) if times else None,
+            "min_sec": round(min(times), 3) if times else None,
+            "max_sec": round(max(times), 3) if times else None,
+            "per_image": per_image,
+        },
+    }
+
+
 def _upload_to_youtube(
     *,
     config: AppConfig,
@@ -1595,6 +1650,148 @@ async def generate_images_only_thumbnail_bg(
         return None, time.time() - start, [message]
 
 
+def wants_thumbnail_candidates(scene_options) -> bool:
+    """画像だけを作る実行で、サムネイル背景を候補の形で作るか（021）。
+
+    候補数が 2 以上か、サムネイル背景のプロンプトの上書き（prompt_overrides の "thumbnail"）があるとき。
+    """
+    from services.media_processing.scene_images import THUMBNAIL_KEY
+
+    if scene_options is None:
+        return False
+    return int(getattr(scene_options, "candidates", 1) or 1) > 1 or THUMBNAIL_KEY in (
+        getattr(scene_options, "prompt_overrides", None) or {}
+    )
+
+
+async def generate_images_only_thumbnail_candidates(
+    config: AppConfig,
+    output_base: Path,
+    theme: str,
+    script,
+    visual_identity,
+    callbacks,
+    scene_options,
+) -> tuple[Optional[Path], float, list[str], Optional[dict]]:
+    """画像だけを作る実行で、サムネイル背景を N 枚の候補と一覧画像で作る（021）。
+
+    - 作るかどうかは 018 と同じ（thumbnail_background_mode が "dynamic" のときだけ）
+    - 候補は <output_base>/thumbnail_bg_candidates/thumbnail_bg_cK.png、一覧画像は同じ場所の
+      thumbnail_bg_sheet.jpg。<output_base>/thumbnail_bg.png は候補 1（picks の thumbnail があればその候補）
+    - seed は場面と同じ決め方（キーは "thumbnail"。regen_scenes に "thumbnail" があれば前の run の続きの seed）
+    - reuse_images_from の run に候補があり、regen_scenes に "thumbnail" が無ければ作らずにその候補を使う
+    - prompt_overrides の "thumbnail" があれば、その文をそのままプロンプトにする
+    - scene_images.json に "thumbnail_bg" として書く。失敗しても例外は投げず警告を返す
+
+    Returns:
+        (thumbnail_bg_path or None, generation_time_sec, warnings, info or None)
+    """
+    from services.media_processing.scene_images import (
+        THUMBNAIL_CANDIDATES_DIR,
+        THUMBNAIL_KEY,
+        add_thumbnail_to_manifest,
+        export_candidates,
+    )
+
+    video_config = getattr(config.yaml, "video_renderer", None)
+    mode = getattr(video_config, "thumbnail_background_mode", "static") if video_config else "static"
+    if mode != "dynamic":
+        callbacks.log(f"[INFO] thumbnail_background_mode={mode} のため、サムネイル背景は作りません")
+        return None, 0.0, [], None
+
+    options = scene_options
+    output_base = Path(output_base)
+    target_dir = output_base / THUMBNAIL_CANDIDATES_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_base / THUMBNAIL_BG_FILENAME
+    warnings: list[str] = []
+    start = time.time()
+    regen = options.is_regen(THUMBNAIL_KEY)
+    previous = options.reuse_thumbnail
+    override = (options.prompt_overrides or {}).get(THUMBNAIL_KEY)
+    info: dict = {}
+    try:
+        if previous and previous.get("candidates") and not regen:
+            callbacks.log(f"[INFO] サムネイル背景は前の run の候補を使います: {options.reuse_dir}")
+            if override is not None:
+                warnings.append(
+                    "prompt override of the thumbnail not used because its candidates were reused "
+                    "(add \"thumbnail\" to regen_scenes to make them from the new prompt)"
+                )
+            candidates = [dict(c, reused=True) for c in previous["candidates"]]
+            info.update(prompt=previous.get("prompt"), source="reused")
+            if previous.get("prompt_override") is not None:
+                info["prompt_override"] = previous["prompt_override"]
+        else:
+            description = getattr(script, "description", "") or ""
+            title = getattr(script, "title", None)
+            summary = description[:300] if description else (theme or title or "")
+            generator = ThumbnailBackgroundGenerator(config, output_dir=output_base)
+            if override is not None:
+                prompt = override
+                info["prompt_override"] = {"kind": "prompt", "text": override}
+            else:
+                prompt = await generator.build_prompt(theme, summary, visual_identity, title)
+            seeds = options.candidate_seeds(THUMBNAIL_KEY, previous, regen)
+            callbacks.log(f"[INFO] サムネイル背景の候補を {len(seeds)} 枚作ります（seed {seeds[0]}〜{seeds[-1]}）")
+            candidates = []
+            for index, seed in enumerate(seeds, start=1):
+                cand = {"index": index, "image_path": None, "seed": seed, "cached": False, "generation_time_sec": 0.0}
+                t0 = time.time()
+                try:
+                    image_path = await generator.generate(
+                        theme=theme,
+                        script_summary=summary,
+                        output_path=target_dir / f"thumbnail_bg_c{index}.png",
+                        visual_identity=visual_identity,
+                        topic_title=title,
+                        prompt=prompt,
+                        seed=seed,
+                    )
+                    if not Path(image_path).is_file():
+                        raise RuntimeError(f"generated file not found: {image_path}")
+                    cand["image_path"] = str(Path(image_path))
+                except Exception as e:
+                    cand["error"] = f"{type(e).__name__}: {' '.join(str(e).split())[:160]}"
+                cand["generation_time_sec"] = round(time.time() - t0, 3)
+                candidates.append(cand)
+            info.update(prompt=prompt, source="generated")
+            failed = [c["index"] for c in candidates if not c["image_path"]]
+            if failed and len(failed) < len(candidates):
+                warnings.append(
+                    f"{len(failed)} of {len(candidates)} thumbnail background candidates failed "
+                    f"(candidate {', '.join(map(str, failed))}); the others are kept"
+                )
+
+        candidates, sheet = export_candidates(candidates, target_dir, "thumbnail_bg", "thumbnail", warnings)
+        usable = [c for c in candidates if c.get("image_path")]
+        if not usable:
+            errors = "; ".join(c.get("error", "no image") for c in candidates[:3])
+            raise RuntimeError(f"all {len(candidates)} candidates failed ({errors})")
+        chosen = usable[0]
+        pick = (options.picks or {}).get(THUMBNAIL_KEY)
+        if pick is not None:
+            match = [c for c in usable if c.get("index") == pick]
+            if match:
+                chosen = match[0]
+                info["picked"] = pick
+            else:
+                warnings.append(f"picked thumbnail background candidate {pick} has no image; used candidate {chosen['index']}")
+        if Path(chosen["image_path"]).resolve() != output_path.resolve():
+            shutil.copy2(chosen["image_path"], output_path)
+        info.update(image_path=str(output_path.resolve()), candidates=candidates, contact_sheet=sheet)
+        add_thumbnail_to_manifest(output_base, info)
+        elapsed = time.time() - start
+        callbacks.log(f"✓ サムネイル背景の候補 {len(usable)} 枚: {target_dir}（一覧画像: {sheet}）")
+        for message in warnings:
+            callbacks.log(f"[WARN] {message}")
+        return output_path, elapsed, warnings, info
+    except Exception as e:
+        message = f"thumbnail background generation failed (scene images are kept): {e}"
+        callbacks.log(f"[WARN] {message}")
+        return None, time.time() - start, warnings + [message], None
+
+
 def run_workflow_sync(
     theme: str,
     overrides: Optional[UIOverrides] = None,
@@ -1615,6 +1812,9 @@ def run_workflow_sync(
     thumbnail_bg: Optional[str] = None,
     youtube_dir: Optional[str] = None,
     reading_fixes: Optional[str] = None,
+    candidates: Optional[int] = None,
+    picks: Optional[Any] = None,
+    prompt_overrides: Optional[Any] = None,
 ) -> WorkflowResult:
     """同期版ワークフロー実行（Gradio から呼び出し用 / 外部台本モード前提）
 
@@ -1658,6 +1858,14 @@ def run_workflow_sync(
             （動画は成功のまま。理由は WorkflowResult.upload_error）。環境変数 ARG_YOUTUBE_DIR（019）
         reading_fixes: 読みの置き換え表（JSON: 語 → かな書き）のパス。合成に渡す文だけを
             置き換え、字幕は本文のまま。環境変数 ARG_READING_FIXES（019）
+        candidates: 1 場面あたりの候補数（images_only のときだけ。1〜16、既定 1 = 今までどおり）。
+            2 以上なら各場面を seed 違いで N 枚作り、scene_images/NN_<id>_cK.png と一覧画像
+            NN_<id>_sheet.jpg を置く。サムネイル背景も N 枚 + 一覧画像（021）
+        picks: 前の run（reuse_images_from）の候補から使う番号。{segment_id: 番号, "thumbnail": 番号}
+            の dict か、その JSON ファイルのパス。指定が無い場面は候補 1。reuse_images_from が要る（021）
+        prompt_overrides: 場面ごとのプロンプトの上書き。{segment_id: 文}（文をそのままプロンプトに）か
+            {segment_id: {focus/draw/avoid}}（描く指示を差し替えて作る）。"thumbnail" は文だけ。
+            dict か JSON ファイルのパス。作る場面（regen_scenes・使い回しの無い場面）にだけ効く（021）
         どれも、指定が無ければ今までどおりに動く。指定したファイル・フォルダが無い・読めない
         ときは、合成の前に success=False で止まる。
 
@@ -1756,7 +1964,15 @@ def run_workflow_sync(
                 callbacks.log(f"読みの置き換え表: {reading_fixes_path}（{len(reading_fixes_table)} 語）")
 
             scene_options = None
-            if regen_scenes or reuse_images_from or strict_requested:
+            # 候補・選択・プロンプトの上書き（021）。指定が無ければ None のまま（今までどおり）
+            candidate_kwargs = {}
+            if candidates is not None:
+                candidate_kwargs["candidates"] = candidates
+            if picks:
+                candidate_kwargs["picks"] = picks
+            if prompt_overrides:
+                candidate_kwargs["prompt_overrides"] = prompt_overrides
+            if regen_scenes or reuse_images_from or strict_requested or candidate_kwargs:
                 from services.media_processing.scene_images import build_scene_image_options
                 try:
                     scene_options = build_scene_image_options(
@@ -1764,7 +1980,13 @@ def run_workflow_sync(
                         regen_seed_offset=regen_seed_offset,
                         reuse_images_from=reuse_images_from,
                         **({"reuse_strict": True} if strict_requested else {}),
+                        **candidate_kwargs,
                     )
+                    if scene_options.candidates > 1 and not images_only:
+                        raise ValueError(
+                            f"candidates: only for images_only runs (got {scene_options.candidates}); "
+                            "the full run uses one image per scene (pick it with picks)"
+                        )
                 except ValueError as _e:
                     callbacks.log(f"❌ {_e}")
                     if log_writer:
@@ -1782,6 +2004,26 @@ def run_workflow_sync(
                         f"作り直す場面: {', '.join(sorted(scene_options.regen_scenes))}"
                         f"（seed +{scene_options.regen_seed_offset}）"
                     )
+                if scene_options.candidates > 1:
+                    callbacks.log(f"1 場面あたり {scene_options.candidates} 枚の候補を作ります")
+                if scene_options.picks:
+                    callbacks.log(f"選んだ候補: {', '.join(f'{k}={v}' for k, v in scene_options.picks.items())}")
+                if scene_options.prompt_overrides:
+                    callbacks.log(f"プロンプトを上書きする場面: {', '.join(scene_options.prompt_overrides)}")
+
+            # 選んだサムネイル背景の候補（021）。本番の実行では thumbnail_bg と同じに使う
+            thumbnail_bg_pick = None
+            if scene_options is not None and not images_only:
+                from services.media_processing.scene_images import THUMBNAIL_KEY, pick_thumbnail_path
+                _pick = scene_options.picks.get(THUMBNAIL_KEY)
+                if _pick is not None and thumbnail_bg_override is not None:
+                    callbacks.log(
+                        f"[WARN] thumbnail_bg が指定されているため、picks の thumbnail={_pick} は使いません"
+                    )
+                elif _pick is not None:
+                    thumbnail_bg_override = pick_thumbnail_path(scene_options, _pick)
+                    thumbnail_bg_pick = _pick
+                    callbacks.log(f"サムネイル背景は前の run の候補 {_pick} を使います: {thumbnail_bg_override}")
 
             # Usage集約用
             total_usage = TotalUsage()
@@ -2028,14 +2270,29 @@ def run_workflow_sync(
                 run_warnings = list(getattr(external_phase_result, "warnings", None) or [])
                 run_warnings += list(images_result.warnings)
                 # サムネイル背景も作る（018）。失敗しても警告だけにして場面画像の結果は返す
-                thumbnail_bg_path, thumbnail_bg_time, thumbnail_bg_warnings = await generate_images_only_thumbnail_bg(
-                    config=config,
-                    output_base=output_base,
-                    theme=theme,
-                    script=scripting_result.script,
-                    visual_identity=scripting_result.visual_identity,
-                    callbacks=callbacks,
-                )
+                thumbnail_info = None
+                if wants_thumbnail_candidates(scene_options):
+                    # 候補の形で作る（021）
+                    (
+                        thumbnail_bg_path, thumbnail_bg_time, thumbnail_bg_warnings, thumbnail_info,
+                    ) = await generate_images_only_thumbnail_candidates(
+                        config=config,
+                        output_base=output_base,
+                        theme=theme,
+                        script=scripting_result.script,
+                        visual_identity=scripting_result.visual_identity,
+                        callbacks=callbacks,
+                        scene_options=scene_options,
+                    )
+                else:
+                    thumbnail_bg_path, thumbnail_bg_time, thumbnail_bg_warnings = await generate_images_only_thumbnail_bg(
+                        config=config,
+                        output_base=output_base,
+                        theme=theme,
+                        script=scripting_result.script,
+                        visual_identity=scripting_result.visual_identity,
+                        callbacks=callbacks,
+                    )
                 run_warnings += thumbnail_bg_warnings
                 total_usage.thumbnail_bg_generation_time = thumbnail_bg_time
                 prompt_report_path, generation_metadata_path = find_prompt_logs(output_base)
@@ -2062,6 +2319,13 @@ def run_workflow_sync(
                     reuse_strict=strict_requested,
                     scene_images=images_result.scene_images,
                     thumbnail_bg_path=thumbnail_bg_path,
+                    image_candidates=int(getattr(scene_options, "candidates", 1) or 1),
+                    thumbnail_bg_candidates=list((thumbnail_info or {}).get("candidates") or []),
+                    thumbnail_bg_contact_sheet=(
+                        Path(thumbnail_info["contact_sheet"])
+                        if thumbnail_info and thumbnail_info.get("contact_sheet") else None
+                    ),
+                    thumbnail_bg_pick=(thumbnail_info or {}).get("picked"),
                     theme=theme,
                     output_dir=output_base,
                     segment_bg_generation_time=images_result.segment_bg_generation_time,
@@ -2235,6 +2499,7 @@ def run_workflow_sync(
                 upload_error=upload_errors[0] if upload_errors else None,
                 reuse_strict=strict_requested,
                 thumbnail_bg_source=str(thumbnail_bg_override) if thumbnail_bg_override is not None else None,
+                thumbnail_bg_pick=thumbnail_bg_pick,
                 reading_fixes_path=reading_fixes_path if reading_fixes_table is not None else None,
                 reading_fixes_applied=reading_fixes_table.applied_count if reading_fixes_table is not None else 0,
                 warnings=run_warnings,

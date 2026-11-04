@@ -24,7 +24,12 @@ from core.models.curation import ScriptSegment
 from core.models.generation_metadata import GenerationMetadata
 from core.models.visual import VisualIdentity, VisualPalette
 from services.media_processing.prompt_ops_logger import PromptOpsLogger
-from services.media_processing.scene_images import ReuseStrictError, SceneImageOptions, scene_record
+from services.media_processing.scene_images import (
+    ReuseStrictError,
+    SceneImageOptions,
+    candidate_path,
+    scene_record,
+)
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -171,13 +176,19 @@ class ImageProvider:
 
     def _record_scene(
         self, segment: ScriptSegment, path: Path, prompt: Optional[str], seed: Optional[int],
-        cached: bool, source: str,
+        cached: bool, source: str, extra: Optional[dict] = None,
     ) -> Path:
-        """Keep the scene in self.scene_records (016) and return path; never fails the image."""
+        """Keep the scene in self.scene_records (016) and return path; never fails the image.
+
+        extra (021): candidates / contact_sheet / picked / prompt_override, only when used.
+        """
         try:
             if not isinstance(getattr(self, "scene_records", None), list):
                 self.scene_records = []
-            self.scene_records.append(scene_record(segment, path, prompt, seed, cached, source))
+            record = scene_record(segment, path, prompt, seed, cached, source)
+            if extra:
+                record.update({k: v for k, v in extra.items() if v is not None})
+            self.scene_records.append(record)
         except Exception as e:  # the record is a report only
             logger.warning(f"Scene record for {segment.segment_id} failed (non-fatal): {e}")
         return path
@@ -199,10 +210,35 @@ class ImageProvider:
             options.unmatched_ids.append(segment.segment_id)
             return None
         path = Path(entry["image_path"])
+        seed = entry.get("seed")
+        # candidates of the previous run (021): carried over, and the picked one is the image
+        extra = None
+        pick = options.pick_for(segment.segment_id) if getattr(options, "picks", None) else None
+        if entry.get("candidates") or pick is not None or entry.get("prompt_override"):
+            extra = {
+                "candidates": entry.get("candidates") or None,
+                "contact_sheet": entry.get("contact_sheet"),
+                "prompt_override": entry.get("prompt_override"),
+            }
+        if pick is not None:
+            picked = candidate_path(entry, pick)
+            if picked:
+                path = Path(picked)
+                for cand in entry.get("candidates") or []:
+                    if isinstance(cand, dict) and cand.get("index") == pick:
+                        seed = cand.get("seed")
+                extra["picked"] = pick
+            else:
+                options.warnings.append(
+                    f"picked candidate {pick} of {segment.segment_id} has no image in {options.reuse_dir}; "
+                    "used the scene image (candidate 1)"
+                )
+        if getattr(options, "prompt_overrides", None) and segment.segment_id in options.prompt_overrides:
+            options.skipped_override_ids.append(segment.segment_id)
         options.reused_ids.append(segment.segment_id)
         logger.info(f"Reusing scene image for {segment.segment_id}: {path}")
         console.print(f"[dim]Reusing image of the previous run: {path.name}[/dim]")
-        return self._record_scene(segment, path, entry.get("prompt"), entry.get("seed"), False, "reused")
+        return self._record_scene(segment, path, entry.get("prompt"), seed, False, "reused", extra)
 
     def finish_scene_images(self) -> None:
         """Move the reuse summary (reused / unmatched scenes) into self.warnings (016)."""
@@ -256,11 +292,10 @@ class ImageProvider:
             
             # 1. Generate prompt from segment with visual identity
             # Issue #6 fix: Pass only visual_identity
-            prompt = await self.prompt_generator.generate_prompt(
-                segment, 
-                visual_identity=self.visual_identity
-            )
-            
+            # (a prompt override of the scene (021) replaces it)
+            prompt, override = await self._scene_prompt(segment)
+            override_extra = {"prompt_override": override} if override is not None else None
+
             # 2. Check cache (prompt-based key)
             cache_key = self._get_prompt_cache_key(prompt)
             cache_path = self.cache_dir / f"{cache_key}.png"
@@ -269,8 +304,13 @@ class ImageProvider:
             # its file name carries the seed so the cached image is kept as it was
             seed = None
             options = getattr(self, "scene_options", None)
-            if options is not None and options.is_regen(segment.segment_id):
-                seed = options.regen_seed(segment.segment_id, options.take_reuse(segment.segment_id))
+            regen = options is not None and options.is_regen(segment.segment_id)
+            previous = options.take_reuse(segment.segment_id) if regen else None
+            if options is not None and int(getattr(options, "candidates", 1) or 1) > 1:
+                # N candidates with consecutive seeds (021)
+                return await self._generate_candidates(segment, prompt, override, regen, previous)
+            if regen:
+                seed = options.regen_seed(segment.segment_id, previous)
                 cache_path = self.cache_dir / f"{cache_key}_seed{seed}.png"
                 console.print(f"[cyan]Regenerating {segment.segment_id} with seed {seed}[/cyan]")
                 logger.info(f"Regenerating scene {segment.segment_id} (cache skipped, seed {seed})")
@@ -291,7 +331,7 @@ class ImageProvider:
                         scene_visual=self._scene_visual_dict(segment),
                         cached=True,
                     ))
-                return self._record_scene(segment, cache_path, prompt, None, True, "cache")
+                return self._record_scene(segment, cache_path, prompt, None, True, "cache", override_extra)
             
             # 3. Generate image via FluxClient
             try:
@@ -327,7 +367,7 @@ class ImageProvider:
                 self._generation_end_time = time.time()
 
                 return self._record_scene(
-                    segment, image_path, prompt, getattr(metadata, "seed", seed), False, "generated"
+                    segment, image_path, prompt, getattr(metadata, "seed", seed), False, "generated", override_extra
                 )
 
             except Exception as e:
@@ -338,8 +378,137 @@ class ImageProvider:
                 console.print(f"[yellow]⚠ Generation failed, using static fallback[/yellow]")
                 self._take_prompt_warnings()
                 self._add_static_fallback_warning(segment, e)
-                return self._record_scene(segment, self._select_static_image(segment), prompt, None, False, "static")
-    
+                return self._record_scene(
+                    segment, self._select_static_image(segment), prompt, None, False, "static", override_extra
+                )
+
+    async def _scene_prompt(self, segment: ScriptSegment) -> tuple[str, Optional[dict]]:
+        """The scene's image prompt and, when a prompt override (021) was used, what it was.
+
+        A text override is the prompt (the fixed no-people prefix is put in front unless it is
+        there already). A focus / draw / avoid override replaces the scene direction for the
+        prompt generator only (the script itself is not changed).
+        """
+        options = getattr(self, "scene_options", None)
+        override = None
+        if options is not None and getattr(options, "prompt_overrides", None):
+            override = options.override_for(segment.segment_id)
+        if override is None:
+            prompt = await self.prompt_generator.generate_prompt(segment, visual_identity=self.visual_identity)
+            return prompt, None
+        if isinstance(override, str):
+            from services.script_generation.image_prompt_generator import ImagePromptGenerator
+
+            prefix = ImagePromptGenerator.SEGMENT_PROMPT_PREFIX
+            prompt = override if override.startswith(prefix) else prefix + override
+            console.print(f"[cyan]Prompt override for {segment.segment_id}[/cyan]")
+            logger.info(f"Prompt override for {segment.segment_id}: {override[:100]}")
+            return prompt, {"kind": "prompt", "text": override}
+
+        from core.models.curation import SceneVisual
+
+        current = getattr(segment, "scene_visual", None)
+        base = current.model_dump() if current is not None else {"start_turn": 0, "focus": "", "draw": "", "avoid": []}
+        base.update(override)
+        try:
+            visual = SceneVisual(**base)
+            changed = segment.model_copy(update={"scene_visual": visual})
+        except Exception as e:
+            self._warning_list().append(
+                f"prompt override for {segment.segment_id} was not usable ({type(e).__name__}: "
+                f"{' '.join(str(e).split())[:160]}); made the prompt from the script as usual"
+            )
+            prompt = await self.prompt_generator.generate_prompt(segment, visual_identity=self.visual_identity)
+            return prompt, None
+        logger.info(f"Scene direction override for {segment.segment_id}: {override}")
+        prompt = await self.prompt_generator.generate_prompt(changed, visual_identity=self.visual_identity)
+        recorded = visual.model_dump()
+        recorded.pop("start_turn", None)
+        return prompt, {"kind": "scene_visual", "scene_visual": recorded}
+
+    async def _generate_candidates(
+        self, segment: ScriptSegment, prompt: str, override: Optional[dict], regen: bool,
+        previous: Optional[dict],
+    ) -> Path:
+        """N images of one scene with consecutive seeds (021); called under the generation lock.
+
+        Each candidate is cached as <prompt hash>_seed<seed>.png, so the same prompt and seed
+        is not drawn twice (except for a scene in regen_scenes, which is always drawn).
+        The scene image is the first candidate that has an image; if none has, a static image
+        is used as when a single image fails.
+        """
+        import time
+
+        options = self.scene_options
+        seeds = options.candidate_seeds(segment.segment_id, previous, regen)
+        cache_key = self._get_prompt_cache_key(prompt)
+        vi_dict = self._visual_identity_dict()
+        candidates: list[dict] = []
+        console.print(
+            f"[cyan]Generating {len(seeds)} candidates for {segment.segment_id} "
+            f"(seeds {seeds[0]}..{seeds[-1]})[/cyan]"
+        )
+        for index, seed in enumerate(seeds, start=1):
+            cand = {"index": index, "image_path": None, "seed": seed, "cached": False, "generation_time_sec": 0.0}
+            cache_path = self.cache_dir / f"{cache_key}_seed{seed}.png"
+            if not regen and cache_path.exists():
+                cand.update(image_path=str(cache_path), cached=True)
+                candidates.append(cand)
+                continue
+            start = time.time()
+            try:
+                image_path, metadata = await self.image_client.generate_image(
+                    prompt=prompt,
+                    output_path=cache_path,
+                    context_type="segment",
+                    segment_id=segment.segment_id,
+                    segment_type=segment.segment_type,
+                    visual_identity=vi_dict,
+                    seed=seed,
+                )
+                elapsed = time.time() - start
+                used_seed = getattr(metadata, "seed", seed)
+                cand.update(
+                    image_path=str(Path(image_path)),
+                    seed=used_seed if isinstance(used_seed, int) and not isinstance(used_seed, bool)
+                    and used_seed >= 0 else seed,
+                    generation_time_sec=round(elapsed, 3),
+                )
+                console.print(f"[green]✓ {segment.segment_id} candidate {index}: {elapsed:.1f}s[/green]")
+                if self.logger:
+                    try:
+                        metadata.scene_visual = self._scene_visual_dict(segment)
+                        self.logger.log_generation(metadata)
+                    except Exception as log_error:
+                        logger.warning(f"PromptOps log failed (non-fatal): {log_error}")
+            except Exception as e:
+                cand["generation_time_sec"] = round(time.time() - start, 3)
+                cand["error"] = f"{type(e).__name__}: {' '.join(str(e).split())[:160]}"
+                logger.error(f"Candidate {index} of {segment.segment_id} failed: {e}")
+                console.print(f"[yellow]⚠ {segment.segment_id} candidate {index} failed[/yellow]")
+            self._generation_end_time = time.time()
+            candidates.append(cand)
+
+        extra = {"candidates": candidates, "prompt_override": override}
+        usable = [c for c in candidates if c["image_path"]]
+        if not usable:
+            self._take_prompt_warnings()
+            self._add_static_fallback_warning(
+                segment, RuntimeError(f"all {len(candidates)} candidates failed ({candidates[0].get('error')})")
+            )
+            return self._record_scene(segment, self._select_static_image(segment), prompt, None, False, "static", extra)
+        failed = [c["index"] for c in candidates if not c["image_path"]]
+        if failed:
+            self._warning_list().append(
+                f"{len(failed)} of {len(candidates)} candidates of {segment.segment_id} failed "
+                f"(candidate {', '.join(map(str, failed))}); the others are kept"
+            )
+        first = usable[0]
+        source = "cache" if all(c["cached"] for c in usable) else "generated"
+        return self._record_scene(
+            segment, Path(first["image_path"]), prompt, first["seed"], first["cached"], source, extra
+        )
+
     def _visual_identity_dict(self) -> dict:
         """Colors and aesthetic of the visual identity, for the prompt records."""
         if not self.visual_identity:
