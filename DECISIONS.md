@@ -1,5 +1,14 @@
 # DECISIONS
 
+## 2026-11-04 画像の候補は引数 candidates、選択と上書きは引数 picks / prompt_overrides で受ける(ブリーフ 021)
+- 決定: `run_workflow_sync` に `candidates`(images_only だけ。1〜16、既定 1)/ `picks` / `prompt_overrides` を足す。picks と prompt_overrides は dict か JSON ファイルのパス。picks は `{segment_id: 番号, "thumbnail": 番号}`(1 始まり)で `reuse_images_from` が要り、無い番号は合成の前に止める。images_only でない実行に candidates ≥ 2 を渡したら止める
+- seed: 候補 K の seed = 始まり + (K−1)。始まりは segment_id から決めた固定値(016 の base_seed_for)。regen_scenes の場面は「前の run の候補の一番大きい seed + regen_seed_offset」から(016 の「前の seed + offset」を候補に広げた形。前に見た絵が戻らない)。サムネイル背景はキー "thumbnail" で同じ決め方。プロンプトと seed が同じ候補はキャッシュ(`<hash>_seed<seed>.png`)を使う
+- 使い回し: 候補ごと次の run に写す(一覧画像も作り直す)。サムネイル背景も、前の run に候補があり regen_scenes に "thumbnail" が無ければ作り直さない(候補 2 以上か "thumbnail" の上書きのときだけ。既定の 018 の動きは変えない)
+- プロンプトの上書き: 文は「人・文字なし」の前置きを付けてそのままプロンプトにする。`{focus, draw, avoid}` は台本の描く指示をその場面だけ差し替えて、いつもの LLM のプロンプト作りに通す。効くのは作る場面(regen_scenes・使い回しの無い場面)だけで、使い回した場面の上書きは warnings に出す
+- 一覧画像: ceil(√N) 列、長辺 2048px、JPEG(品質 90)。番号は各タイルの左上に黒地白字(タイルの高さの 28%)。失敗した候補は灰色のタイルにして番号を残す
+- 理由: run_remote.py は run_workflow_sync を直接呼ぶので、引数なら Windows の run にファイルを送らずに済み、前の run も書き換えない。上書きを作る場面だけに効かせると、「作り直すかどうか」の切り替えが regen_scenes 1 つで済む
+- 却下案: 前の run に picks.json を置く(送り込みが要り、前回の残りに黙って従う)/ 上書きした場面を自動で作り直す(本番の実行に上書きを渡すと黙って作り直してしまう)/ 一覧画像を PNG にする(3×3 で数 MB になる)/ 候補の seed を乱数にする(同じ候補を作り直せず、キャッシュも効かない)
+
 ## 2026-11-02 タイトル・概要欄の半角 < > は全角に置き換えず「落とす」(ブリーフ 020)
 - 決定: `sanitize_for_youtube` で半角 `<` `>` を削除する(`strip_angle_brackets`)。参考文献の題が `<16 進>` だけ(PDF の内部名)なら題を出さず「参考文献N(ドメイン)」にする(`is_hex_only_title`。`format_reference_label` の中なので概要欄と metadata.txt の両方に効く)。動画タイトル(`_build_publish_fields` の `formatted_title`)と、アップロード直前の保険(`_upload_to_youtube`)でも同じく落とす。全角 ＜ ＞ は触らない
 - 理由: 既存の処理(制御文字・URL)は「落とす」流儀で、radio_director 側(phase_d/metadata_generator.resolve_references)も落としている。両経路で同じ見た目にそろう。題の中の < > は「<速報>」のような囲みが多く、外しても読める

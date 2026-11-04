@@ -69,17 +69,21 @@ class ThumbnailBackgroundGenerator:
         script_summary: str,
         output_path: Path,
         visual_identity: Optional[VisualIdentity] = None,
-        topic_title: Optional[str] = None
+        topic_title: Optional[str] = None,
+        prompt: Optional[str] = None,
+        seed: Optional[int] = None,
     ) -> Path:
         """Generate thumbnail background image
-        
+
         Args:
             theme: Video theme
             script_summary: Script summary (200-300 chars)
             output_path: Output path for generated image
             visual_identity: Optional visual identity for brand consistency
             topic_title: Optional topic title
-        
+            prompt: ready-made prompt (candidates, 021); None = made here as before
+            seed: fixed seed (candidates, 021); None = random as before
+
         Returns:
             Path: Path to generated image
         
@@ -96,13 +100,9 @@ class ThumbnailBackgroundGenerator:
         
         # 1. Generate prompt with visual identity
         # Issue #6 fix: Pass only visual_identity
-        prompt = await self.prompt_generator.generate_thumbnail_prompt(
-            theme=theme,
-            script_summary=script_summary,
-            topic_title=topic_title,
-            visual_identity=identity
-        )
-        
+        if prompt is None:
+            prompt = await self.build_prompt(theme, script_summary, identity, topic_title)
+
         console.print(f"[dim]Prompt: {prompt[:80]}...[/dim]")
         
         # Prepare visual identity dict for metadata
@@ -120,6 +120,7 @@ class ThumbnailBackgroundGenerator:
             output_path=output_path,
             context_type="thumbnail",
             visual_identity=vi_dict,
+            **({"seed": seed} if seed is not None else {}),
         )
         
         console.print(f"[green]✓ Thumbnail background generated: {image_path.name}[/green]")
@@ -131,6 +132,21 @@ class ThumbnailBackgroundGenerator:
         
         return image_path
     
+    async def build_prompt(
+        self,
+        theme: str,
+        script_summary: str,
+        visual_identity: Optional[VisualIdentity] = None,
+        topic_title: Optional[str] = None,
+    ) -> str:
+        """The thumbnail background prompt (made once for all candidates, 021)."""
+        return await self.prompt_generator.generate_thumbnail_prompt(
+            theme=theme,
+            script_summary=script_summary,
+            topic_title=topic_title,
+            visual_identity=visual_identity,
+        )
+
     async def check_availability(self) -> bool:
         """Check if image generation API is available
         

@@ -1,5 +1,14 @@
 # STATUS
 
+## 画像段で 1 場面あたり N 枚の候補と一覧画像を作る(ブリーフ 021)— 2026-11-04 時点
+- ブランチ `pm/021` に実装済み。main へは未マージ(PM が報告を見てから merge)。radio_director 側(run_remote.py)は次のジョブ。渡し方は `.pm/reports/021.md` の「未解決点」
+- `run_workflow_sync` の新しい引数(どれも指定が無ければ今までどおり)
+  - `candidates=N`(images_only だけ、1〜16): 各場面を seed 違いで N 枚。`scene_images/NN_<id>_cK.png` と一覧画像 `NN_<id>_sheet.jpg`(ceil(√N) 列・長辺 2048px)。`scene_images.json` の各場面に `candidates` / `contact_sheet`。サムネイル背景(dynamic のときだけ)も `thumbnail_bg_candidates/thumbnail_bg_cK.png` と `thumbnail_bg_sheet.jpg`、`scene_images.json` の `thumbnail_bg`
+  - `picks={segment_id: K, "thumbnail": K}`(dict か JSON ファイル。`reuse_images_from` が要る): 前の run の候補 K を使う。thumbnail は本番では `thumbnail_bg` と同じ扱い
+  - `prompt_overrides={segment_id: 文 | {focus, draw, avoid}, "thumbnail": 文}`: 作る場面のプロンプトを上書きし、`prompt_override` に記録。verified_script は書き換えない
+- 生成時間: 候補ごとに `candidates[].generation_time_sec`。集計は `build_image_candidates_result_fields(result)` の `image_generation_times`
+- テスト: `tests/test_image_candidates_021.py` を追加。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)
+
 ## タイトル・概要欄から半角 < > を落とす(ブリーフ 020)— 2026-11-02 時点
 - ブランチ `pm/020` に実装済み。main へは未マージ(PM が報告を見てから merge)
 - `sanitize_for_youtube` が半角 `<` `>` を落とす。参考文献の題が `<16 進>` だけ(PDF の内部名)なら「参考文献N(ドメイン)」。動画タイトルとアップロード直前の保険でも落とす(ログに「< > が残っていた」)
