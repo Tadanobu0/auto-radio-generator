@@ -1,5 +1,12 @@
 # STATUS
 
+## 画像段を B70(ComfyUI)へ移すための調査(ブリーフ 022)— 2026-11-08 時点
+- 調査のみ。コード・設定は変えていない。詳細は `.pm/reports/022.md`
+- ARG には ComfyUI 用のクライアント(`services/media_processing/comfyui_client.py`)がすでにあり、リポジトリの config.yaml は `image_provider: comfyui`(127.0.0.1:8188・768×432・steps 4・euler / normal)。ブリーフの前提(Forge・1344×768)と食い違うので、Windows の本番の設定を PM が確かめる
+- 画像段の機能(候補・一覧画像・作り直し・上書き・使い回し・キャッシュ)は `generate_image(..., seed)` だけに依存し、Forge 固有の API は使っていない
+- 推奨は案A(Mac の arg-render で images_only も回し、ComfyUIClient を B70 のワークフローに合わせる)。ブリーフは ARG / radio_director(+ arg-render)/ 確認の 3 本。PM の判断待ち
+- radio_director・arg-render・b70-box はこのジョブから読めず未確認
+
 ## 画像段で 1 場面あたり N 枚の候補と一覧画像を作る(ブリーフ 021)— 2026-11-04 時点
 - ブランチ `pm/021` に実装済み。main へは未マージ(PM が報告を見てから merge)。radio_director 側(run_remote.py)は次のジョブ。渡し方は `.pm/reports/021.md` の「未解決点」
 - `run_workflow_sync` の新しい引数(どれも指定が無ければ今までどおり)
