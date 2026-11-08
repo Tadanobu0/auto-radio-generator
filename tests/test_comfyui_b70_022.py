@@ -40,7 +40,7 @@ def _b70_config(**changes) -> SimpleNamespace:
         height=432,
         cfg=1.0,
         sampler_name="euler",
-        scheduler="simple",
+        scheduler="normal",  # b70.overlay.yaml と同じ(023 で本番に合わせて simple → normal)
         poll_interval_sec=0.5,
     )
     values.update(changes)
@@ -205,7 +205,8 @@ def test_generate_image_against_b70(fake_comfy, tmp_path):
     assert sent["7"]["inputs"]["text"] == ""  # 負は書き換えない
     assert (sent["5"]["inputs"]["width"], sent["5"]["inputs"]["height"]) == (1344, 768)
     k = sent["3"]["inputs"]
-    assert (k["seed"], k["steps"], k["cfg"], k["sampler_name"], k["scheduler"]) == (1234, 4, 1.0, "euler", "simple")
+    # 写しの JSON は simple のまま。送る中身は config の normal に書き換わる(023)
+    assert (k["seed"], k["steps"], k["cfg"], k["sampler_name"], k["scheduler"]) == (1234, 4, 1.0, "euler", "normal")
     # 取り出しは history の subfolder / type
     assert fake_comfy.view_params == [{"filename": "flux1-schnell_00001_.png", "subfolder": "ARG", "type": "output"}]
     assert path == out and out.read_bytes() == b"PNG-BYTES"
@@ -300,7 +301,7 @@ def test_b70_overlay_from_env(monkeypatch):
     assert config.yaml.image_provider == "comfyui"
     assert c.base_url == B70_URL
     assert c.workflow_path == "config/workflow_b70_flux1_schnell_fp8.api.json"
-    assert (c.sampler_name, c.scheduler, c.steps, c.cfg, c.poll_interval_sec) == ("euler", "simple", 4, 1.0, 0.5)
+    assert (c.sampler_name, c.scheduler, c.steps, c.cfg, c.poll_interval_sec) == ("euler", "normal", 4, 1.0, 0.5)
     # 大きさは本番(config.yaml)と同じ値の例
     assert (c.width, c.height) == (plain.yaml.comfyui.width, plain.yaml.comfyui.height)
     # 重ねていない節はそのまま
