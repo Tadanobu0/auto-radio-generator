@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-11-08 B70 の overlay の scheduler を本番と同じ normal にし、ワークフローの写しは simple のまま残す(ブリーフ 023)
+- 決定: `config/b70.overlay.yaml` の `comfyui.scheduler` を simple → normal(768×432・steps 4・cfg 1・euler は変えない)。`config/workflow_b70_flux1_schnell_fp8.api.json` の KSampler の scheduler(simple)は変えない
+- 理由: radio_director-078 で本番(Windows の ComfyUI)は euler / normal と確認。PM の方針は「送り先だけを替える」。ワークフローを読む経路は `ComfyUIClient.generate_image` だけで、送る前に必ず config の scheduler で書き換える(`ComfyUIConfig.scheduler` は既定 normal で必ず値がある)ので、写しの値は送られない
+- 却下案: 写しの JSON も normal にする(正本 b70-box の `flux1-schnell-fp8.api.json` と写しがずれる。送る中身は変わらない)
+
 ## 2026-11-08 画像段は Mac の arg-render から B70 の ComfyUI へ送る(案A。ブリーフ 022、PM 判断)
 - 決定: 案A。Mac で `run_workflow_sync(images_only=True)` を回し、ARG の ComfyUIClient が B70(http://192.168.0.70:8188)へ送る。大きさは今の本番と同じにして送り先だけ替える(1344×768 への変更は別の作業。ARG は大きさを設定で選べるようにするだけ)。Windows の画像段は予備として残し、切り替えのスイッチは radio_director 側に置く。B70 のワークフロー JSON は ARG に写して持ち、正本は b70-box と README に書く。B70 の ComfyUI は forge-gen と共用し、キューの順番待ちは許す(VRAM は常駐のまま)
 - 理由: ARG にはもう ComfyUI のクライアントがあり、画像段の機能はすべて `generate_image(..., seed)` の上で動く。Windows を起こす経路(使用中の終了コード 20)が画像段から消える

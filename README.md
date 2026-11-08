@@ -539,8 +539,8 @@ chmod +x .git/hooks/pre-commit
 
 - 送り先は `image_provider`(`forge` / `comfyui`)と、`flux:` / `comfyui:` の節で決まる。リポジトリの config.yaml は Windows の本番用(127.0.0.1)
 - **config.yaml に重ねる yaml**(2026-11-08、ブリーフ 022): 環境変数 `ARG_CONFIG=<yaml>` か `run_workflow_sync(..., config_overlay="<yaml>")`。相対パスは ARG の直下から。書いたキーだけが置き換わる(dict はキーごと)。ファイルが無い・壊れているときは止まる
-- **B70 の ComfyUI へ送る**: `config/b70.overlay.yaml`(送り先 `http://192.168.0.70:8188`、sampler euler / scheduler simple / steps 4 / cfg 1、ポーリング 0.5 秒)。width / height は本番に合わせて書き換える前提
-- **B70 のワークフロー**: `config/workflow_b70_flux1_schnell_fp8.api.json` は写し。**正本は b70-box の `comfyui/workflows/flux1-schnell-fp8.api.json`**。正本を変えたらこちらも写し直す。ARG はプロンプト・大きさ・seed・steps・cfg・sampler・scheduler を毎回書き換えるので、写しに入っている値は使われない
+- **B70 の ComfyUI へ送る**: `config/b70.overlay.yaml`(送り先 `http://192.168.0.70:8188`、768×432 / sampler euler / scheduler normal / steps 4 / cfg 1、ポーリング 0.5 秒)。値は本番(Windows の ComfyUI)と同じで、違うのは送り先だけ(scheduler は 2026-11-08 ブリーフ 023 で simple → normal。radio_director-078 の確認結果)
+- **B70 のワークフロー**: `config/workflow_b70_flux1_schnell_fp8.api.json` は写し。**正本は b70-box の `comfyui/workflows/flux1-schnell-fp8.api.json`**。正本を変えたらこちらも写し直す。ARG はプロンプト・大きさ・seed・steps・cfg・sampler・scheduler を毎回書き換えるので、写しに入っている値は使われない(写しの scheduler は正本どおり simple のままだが、送るときは config の normal になる)
 - ComfyUIClient はノードを決め打ちの番号(3/4/5/6/7/9、`comfyui.node_ids` で上書き可)で探し、合わなければ class_type と KSampler の配線で探す。潜在画像は `EmptyLatentImage` と `EmptySD3LatentImage` のどちらでもよい
 - 画像のキャッシュ(`output/.image_cache/`)のキーには、種類・送り先・大きさが入る。127.0.0.1 / localhost の送り先だけ、前の形(プロンプトだけ)のファイルも見る
 

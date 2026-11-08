@@ -1,5 +1,11 @@
 # STATUS
 
+## B70 の overlay の scheduler を本番と同じ normal にする(ブリーフ 023)— 2026-11-08 時点
+- ブランチ `pm/023` に実装済み。main へは未マージ
+- `config/b70.overlay.yaml` は 768×432 / steps 4 / cfg 1 / euler / normal で本番と同じ。違うのは送り先(と poll 0.5 秒・timeout)だけ
+- ワークフローの写しの scheduler は正本どおり simple のまま(ComfyUIClient が毎回 config の値で書き換えるので送られない)
+- テスト: `tests/test_comfyui_b70_022.py` の期待を normal に更新。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)
+
 ## 画像段を B70(ComfyUI)へ送る — 調査と案A の ARG 側(ブリーフ 022)— 2026-11-08 時点
 - ブランチ `pm/022` に実装済み。main へは未マージ。radio_director 側(Mac で画像段を回す・Windows の予備のスイッチ)は次のジョブ。呼び出し方は `.pm/reports/022.md`
 - PM 判断: 案A。大きさは今の本番のまま送り先だけ替える(1344×768 は別の作業)。Windows の画像段は予備。B70 のワークフローは ARG に写し、正本は b70-box。forge-gen と ComfyUI を共用(順番待ち可)

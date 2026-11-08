@@ -4,8 +4,8 @@
 #         または run_workflow_sync(..., config_overlay="config/b70.overlay.yaml")
 # ここに書いたキーだけが config.yaml の値を置き換える(dict はキーごとに重なる)。
 #
-# 大きさ(width / height)は今の本番に合わせて書き換える前提の値。
-# 本番の送り先と大きさは radio_director 側のブリーフで確かめる。1344x768 への変更は別の作業
+# 大きさ・steps・cfg・sampler・scheduler は本番(Windows の ComfyUI)と同じ値
+# (radio_director-078 で確認: 768x432 / steps 4 / cfg 1 / euler / normal)。1344x768 への変更は別の作業
 # (変えるときは video_renderer.pan_work_width も見直す)。
 #
 # ワークフローの正本は b70-box の comfyui/workflows/flux1-schnell-fp8.api.json。
@@ -23,4 +23,4 @@ comfyui:
   steps: 4
   cfg: 1.0
   sampler_name: "euler"
-  scheduler: "simple"
+  scheduler: "normal"     # 本番(Windows の ComfyUI、ARG の既定 normal)に合わせた。radio_director-078 の確認結果(ブリーフ 023)
