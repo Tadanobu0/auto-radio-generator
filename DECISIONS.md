@@ -1,5 +1,17 @@
 # DECISIONS
 
+## 2026-11-08 画像段は Mac の arg-render から B70 の ComfyUI へ送る(案A。ブリーフ 022、PM 判断)
+- 決定: 案A。Mac で `run_workflow_sync(images_only=True)` を回し、ARG の ComfyUIClient が B70(http://192.168.0.70:8188)へ送る。大きさは今の本番と同じにして送り先だけ替える(1344×768 への変更は別の作業。ARG は大きさを設定で選べるようにするだけ)。Windows の画像段は予備として残し、切り替えのスイッチは radio_director 側に置く。B70 のワークフロー JSON は ARG に写して持ち、正本は b70-box と README に書く。B70 の ComfyUI は forge-gen と共用し、キューの順番待ちは許す(VRAM は常駐のまま)
+- 理由: ARG にはもう ComfyUI のクライアントがあり、画像段の機能はすべて `generate_image(..., seed)` の上で動く。Windows を起こす経路(使用中の終了コード 20)が画像段から消える
+- 却下案: 案B Windows の ARG のまま送り先だけ B70(起こす・使用中で止まるが残る)/ 案C forge-gen を共通部品として呼ぶ(2 部品の版ずれ、seed 制御が未確認)/ ワークフローを b70-box から参照する(Mac の配置に依存する)
+
+## 2026-11-08 B70 用の設定は ARG_CONFIG の yaml を config.yaml に重ねて切り替える(ブリーフ 022)
+- 決定: 環境変数 `ARG_CONFIG`(または `run_workflow_sync(config_overlay=...)`)に yaml のパスを渡すと、config.yaml を読んだ後にその yaml を深く重ねる(dict はキーごと、それ以外は置き換え)。相対パスはプロジェクト直下から。ファイルが無い・壊れているときは例外で止める(黙って 127.0.0.1 に送らない)。例は `config/b70.overlay.yaml`
+- キャッシュ: クライアントが `cache_identity()`(種類・送り先・大きさ)を出すときは、キーを `sha256(identity + "\n" + prompt)` にする。送り先が 127.0.0.1 / localhost のときだけ、見つからなければ前の形(`sha256(prompt)`)のファイルも見る(Windows の今のキャッシュがそのまま当たる)
+- ComfyUI のノード: KSampler は決め打ちの番号が KSampler ならそれ、違えば class_type で探す。プロンプト・潜在画像は KSampler の配線からたどり、だめなら決め打ちの番号。SaveImage も同じ。取り出しは history の subfolder / type を使う。ポーリング間隔は `comfyui.poll_interval_sec`(既定 2 秒)
+- 理由: config.yaml の全体を写すと本番の設定とずれる。重ねる形なら B70 の差分だけを持てる。キャッシュの前の形を local だけで見るのは、Windows の今の動きを変えないため
+- 却下案: ARG_CONFIG で config.yaml を丸ごと置き換える(写しが古くなる)/ キャッシュの前の形を捨てる(Windows のキャッシュが一度すべて外れる)/ ノードを番号の決め打ちのまま(B70 の形が違うと黙って静止画に落ちる)
+
 ## 2026-11-04 画像の候補は引数 candidates、選択と上書きは引数 picks / prompt_overrides で受ける(ブリーフ 021)
 - 決定: `run_workflow_sync` に `candidates`(images_only だけ。1〜16、既定 1)/ `picks` / `prompt_overrides` を足す。picks と prompt_overrides は dict か JSON ファイルのパス。picks は `{segment_id: 番号, "thumbnail": 番号}`(1 始まり)で `reuse_images_from` が要り、無い番号は合成の前に止める。images_only でない実行に candidates ≥ 2 を渡したら止める
 - seed: 候補 K の seed = 始まり + (K−1)。始まりは segment_id から決めた固定値(016 の base_seed_for)。regen_scenes の場面は「前の run の候補の一番大きい seed + regen_seed_offset」から(016 の「前の seed + offset」を候補に広げた形。前に見た絵が戻らない)。サムネイル背景はキー "thumbnail" で同じ決め方。プロンプトと seed が同じ候補はキャッシュ(`<hash>_seed<seed>.png`)を使う

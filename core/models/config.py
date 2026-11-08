@@ -486,6 +486,11 @@ class ComfyUIConfig(BaseModel):
     cfg: float = 1.0
     sampler_name: str = "euler"
     scheduler: str = "normal"
+    # history を見に行く間隔(秒)。B70 は 1 枚が数秒なので 0.5 にする (022)
+    poll_interval_sec: float = 2.0
+    # 決め打ちのノード番号の上書き (022)。None = ComfyUIClient.NODE_IDS。
+    # どちらでも、番号が合わないときは class_type と配線で探す
+    node_ids: Optional[Dict[str, str]] = None
 
 
 class VideoConfig(BaseModel):
@@ -591,16 +596,67 @@ class AppConfig(BaseModel):
         arbitrary_types_allowed = True
 
 
+CONFIG_OVERLAY_ENV = "ARG_CONFIG"
+
+
+def deep_merge(base: dict, overlay: dict) -> dict:
+    """overlay を base に重ねた新しい dict。dict 同士はキーごと、それ以外は overlay で置き換える (022)。"""
+    out = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def resolve_config_overlay(
+    project_root: Path, overlay: Path | str | None = None, environ: Optional[dict] = None
+) -> Optional[Path]:
+    """重ねる yaml のパス (022)。引数が無ければ環境変数 ARG_CONFIG。どちらも無ければ None。
+
+    相対パスはプロジェクト直下から。指定したのにファイルが無ければ FileNotFoundError
+    (黙って config.yaml だけで動くと、Mac から 127.0.0.1 の画像生成に送ってしまう)。
+    """
+    env = os.environ if environ is None else environ
+    value = overlay if overlay not in (None, "") else (env.get(CONFIG_OVERLAY_ENV) or "").strip()
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = Path(project_root) / path
+    if not path.is_file():
+        raise FileNotFoundError(f"{CONFIG_OVERLAY_ENV}: config overlay not found: {path}")
+    return path
+
+
+def _load_overlay(path: Path) -> dict:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception as e:
+        raise ValueError(f"{CONFIG_OVERLAY_ENV}: cannot read {path} ({type(e).__name__}: {e})") from e
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{CONFIG_OVERLAY_ENV}: {path} must be a mapping at the top level")
+    return data
+
+
 def load_config(
     project_root: Path | str | None = None,
-    config_file: str = "config.yaml"
+    config_file: str = "config.yaml",
+    overlay: Path | str | None = None,
 ) -> AppConfig:
     """設定を読み込む
-    
+
     Args:
         project_root: プロジェクトルートディレクトリ
         config_file: YAML設定ファイル名
-    
+        overlay: config.yaml に重ねる yaml (022)。None なら環境変数 ARG_CONFIG。
+            どちらも無ければ今までどおり config.yaml だけ。指定したファイルが無い・
+            壊れている・重ねた結果が設定として正しくないときは例外で止める
+
     Returns:
         AppConfig: 統合設定オブジェクト
     """
@@ -619,7 +675,17 @@ def load_config(
     
     # YAML設定を読み込み
     yaml_path = project_root / config_file
-    if yaml_path.exists():
+    overlay_path = resolve_config_overlay(project_root, overlay)
+    if overlay_path is not None:
+        # 重ねる指定があるときは、読めなければ止める (既定の動きの WARNING + 既定値には落とさない)
+        base = {}
+        if yaml_path.exists():
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                base = yaml.safe_load(f) or {}
+        merged = deep_merge(base, _load_overlay(overlay_path))
+        yaml_config = YamlConfig.model_validate(merged)
+        print(f"INFO: {yaml_path.name} に {overlay_path} を重ねて読みました ({CONFIG_OVERLAY_ENV})")
+    elif yaml_path.exists():
         try:
             with open(yaml_path, "r", encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f)

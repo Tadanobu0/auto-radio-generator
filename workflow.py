@@ -1792,6 +1792,19 @@ async def generate_images_only_thumbnail_candidates(
         return None, time.time() - start, warnings + [message], None
 
 
+def _log_image_backend(config, callbacks) -> None:
+    """画像の送り先を処理ログに 1 行残す（022）。設定が欠けていても止めない。"""
+    try:
+        provider = getattr(config.yaml, "image_provider", "forge")
+        section = getattr(config.yaml, "comfyui" if provider == "comfyui" else "flux", None)
+        callbacks.log(
+            f"画像生成: {provider} {getattr(section, 'base_url', '?')} "
+            f"{getattr(section, 'width', '?')}x{getattr(section, 'height', '?')}"
+        )
+    except Exception:
+        pass
+
+
 def run_workflow_sync(
     theme: str,
     overrides: Optional[UIOverrides] = None,
@@ -1815,6 +1828,7 @@ def run_workflow_sync(
     candidates: Optional[int] = None,
     picks: Optional[Any] = None,
     prompt_overrides: Optional[Any] = None,
+    config_overlay: Optional[str] = None,
 ) -> WorkflowResult:
     """同期版ワークフロー実行（Gradio から呼び出し用 / 外部台本モード前提）
 
@@ -1866,6 +1880,9 @@ def run_workflow_sync(
         prompt_overrides: 場面ごとのプロンプトの上書き。{segment_id: 文}（文をそのままプロンプトに）か
             {segment_id: {focus/draw/avoid}}（描く指示を差し替えて作る）。"thumbnail" は文だけ。
             dict か JSON ファイルのパス。作る場面（regen_scenes・使い回しの無い場面）にだけ効く（021）
+        config_overlay: config.yaml に重ねる yaml のパス（例 "config/b70.overlay.yaml"。相対パスは
+            ARG の直下から）。無ければ環境変数 ARG_CONFIG。ファイルが無い・壊れているときは
+            success=False で止まる（022）
         どれも、指定が無ければ今までどおりに動く。指定したファイル・フォルダが無い・読めない
         ときは、合成の前に success=False で止まる。
 
@@ -1887,7 +1904,12 @@ def run_workflow_sync(
             callbacks.progress(0.0, "🚀 生成プロセスを開始します...")
             callbacks.log("設定を読み込み中...")
             
-            config = load_config(PROJECT_ROOT)
+            # config.yaml に重ねる yaml（022）。指定が無ければ今までどおり load_config(PROJECT_ROOT)
+            if config_overlay:
+                config = load_config(PROJECT_ROOT, overlay=config_overlay)
+            else:
+                config = load_config(PROJECT_ROOT)
+            _log_image_backend(config, callbacks)
 
             # MockモードはUIの実行ボタン種別を優先する
             # - 通常の「動画を生成する」: use_mock=False

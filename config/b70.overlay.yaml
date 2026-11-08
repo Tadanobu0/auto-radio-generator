@@ -1,0 +1,26 @@
+# B70 の ComfyUI へ画像を送るときに config.yaml へ重ねる設定 (ブリーフ 022)
+#
+# 使い方: 環境変数 ARG_CONFIG=config/b70.overlay.yaml(相対パスは ARG の直下から)、
+#         または run_workflow_sync(..., config_overlay="config/b70.overlay.yaml")
+# ここに書いたキーだけが config.yaml の値を置き換える(dict はキーごとに重なる)。
+#
+# 大きさ(width / height)は今の本番に合わせて書き換える前提の値。
+# 本番の送り先と大きさは radio_director 側のブリーフで確かめる。1344x768 への変更は別の作業
+# (変えるときは video_renderer.pan_work_width も見直す)。
+#
+# ワークフローの正本は b70-box の comfyui/workflows/flux1-schnell-fp8.api.json。
+# ARG には config/workflow_b70_flux1_schnell_fp8.api.json として写しを持つ(README の「画像生成」)。
+
+image_provider: "comfyui"
+
+comfyui:
+  base_url: "http://192.168.0.70:8188"   # B70 の ComfyUI(GPU0 常駐、認証なし。forge-gen と共用)
+  workflow_path: "config/workflow_b70_flux1_schnell_fp8.api.json"
+  timeout: 600            # キューで forge-gen の後ろに並ぶ分も含めた 1 枚の上限(秒)
+  poll_interval_sec: 0.5  # B70 は 1 枚が数秒なので細かく見る
+  width: 768              # ← 本番に合わせる
+  height: 432             # ← 本番に合わせる
+  steps: 4
+  cfg: 1.0
+  sampler_name: "euler"
+  scheduler: "simple"

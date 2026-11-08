@@ -296,9 +296,9 @@ class ImageProvider:
             prompt, override = await self._scene_prompt(segment)
             override_extra = {"prompt_override": override} if override is not None else None
 
-            # 2. Check cache (prompt-based key)
+            # 2. Check cache (prompt-based key, with the backend and size: 022)
             cache_key = self._get_prompt_cache_key(prompt)
-            cache_path = self.cache_dir / f"{cache_key}.png"
+            cache_path = self._cache_path(prompt)
 
             # A scene in regen_scenes (016) skips the cache and gets a shifted seed;
             # its file name carries the seed so the cached image is kept as it was
@@ -441,7 +441,6 @@ class ImageProvider:
 
         options = self.scene_options
         seeds = options.candidate_seeds(segment.segment_id, previous, regen)
-        cache_key = self._get_prompt_cache_key(prompt)
         vi_dict = self._visual_identity_dict()
         candidates: list[dict] = []
         console.print(
@@ -450,7 +449,8 @@ class ImageProvider:
         )
         for index, seed in enumerate(seeds, start=1):
             cand = {"index": index, "image_path": None, "seed": seed, "cached": False, "generation_time_sec": 0.0}
-            cache_path = self.cache_dir / f"{cache_key}_seed{seed}.png"
+            # a regenerated scene is always drawn, into the new-style key (022)
+            cache_path = self._cache_path(prompt, f"_seed{seed}", allow_legacy=not regen)
             if not regen and cache_path.exists():
                 cand.update(image_path=str(cache_path), cached=True)
                 candidates.append(cand)
@@ -578,13 +578,59 @@ class ImageProvider:
         
         Uses SHA-256 full hash to prevent collision risks.
         
+        The image client's cache_identity() (backend, server, size: 022) is part of the key,
+        so an image of another server or size is not taken for this one. A client without it
+        (older or fake clients) keeps the old key, the hash of the prompt alone.
+
         Args:
             prompt: Image generation prompt
-        
+
         Returns:
             str: Cache key (64-char hex, SHA-256)
         """
-        return hashlib.sha256(prompt.encode()).hexdigest()
+        identity = self._cache_identity()
+        if identity is None:
+            return hashlib.sha256(prompt.encode()).hexdigest()
+        return hashlib.sha256(f"{identity}\n{prompt}".encode()).hexdigest()
+
+    def _cache_identity(self) -> Optional[str]:
+        """The image client's cache_identity() (022), or None if it has none."""
+        method = getattr(getattr(self, "image_client", None), "cache_identity", None)
+        if not callable(method):
+            return None
+        try:
+            identity = method()
+        except Exception as e:  # the key must not fail the image
+            logger.warning(f"cache_identity failed (non-fatal, prompt-only cache key): {e}")
+            return None
+        return identity if isinstance(identity, str) and identity else None
+
+    def _cache_path(self, prompt: str, suffix: str = "", allow_legacy: bool = True) -> Path:
+        """Cache file of this prompt (and suffix, e.g. "_seed12").
+
+        Before 022 the key was the prompt alone. Those files were all made on the machine's
+        own server, so for a client on 127.0.0.1 / localhost an old-style file is still used
+        when the new-style one is not there (the Windows cache keeps hitting as before).
+        A remote server (B70) never takes an old-style file.
+        """
+        path = self.cache_dir / f"{self._get_prompt_cache_key(prompt)}{suffix}.png"
+        if path.exists() or not allow_legacy or not self._is_local_backend():
+            return path
+        legacy = self.cache_dir / f"{hashlib.sha256(prompt.encode()).hexdigest()}{suffix}.png"
+        return legacy if legacy.exists() else path
+
+    def _is_local_backend(self) -> bool:
+        """True when the image client has a cache identity and its server is this machine."""
+        if self._cache_identity() is None:
+            return False
+        from urllib.parse import urlparse
+
+        base_url = str(getattr(self.image_client, "base_url", "") or "")
+        try:
+            host = (urlparse(base_url).hostname or "").lower()
+        except ValueError:
+            return False
+        return host in {"127.0.0.1", "localhost", "::1"}
     
     def get_total_generation_time(self) -> float:
         """Get total wall-clock time for all image generation
