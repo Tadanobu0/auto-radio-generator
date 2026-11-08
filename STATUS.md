@@ -1,11 +1,12 @@
 # STATUS
 
-## 画像段を B70(ComfyUI)へ移すための調査(ブリーフ 022)— 2026-11-08 時点
-- 調査のみ。コード・設定は変えていない。詳細は `.pm/reports/022.md`
-- ARG には ComfyUI 用のクライアント(`services/media_processing/comfyui_client.py`)がすでにあり、リポジトリの config.yaml は `image_provider: comfyui`(127.0.0.1:8188・768×432・steps 4・euler / normal)。ブリーフの前提(Forge・1344×768)と食い違うので、Windows の本番の設定を PM が確かめる
-- 画像段の機能(候補・一覧画像・作り直し・上書き・使い回し・キャッシュ)は `generate_image(..., seed)` だけに依存し、Forge 固有の API は使っていない
-- 推奨は案A(Mac の arg-render で images_only も回し、ComfyUIClient を B70 のワークフローに合わせる)。ブリーフは ARG / radio_director(+ arg-render)/ 確認の 3 本。PM の判断待ち
-- radio_director・arg-render・b70-box はこのジョブから読めず未確認
+## 画像段を B70(ComfyUI)へ送る — 調査と案A の ARG 側(ブリーフ 022)— 2026-11-08 時点
+- ブランチ `pm/022` に実装済み。main へは未マージ。radio_director 側(Mac で画像段を回す・Windows の予備のスイッチ)は次のジョブ。呼び出し方は `.pm/reports/022.md`
+- PM 判断: 案A。大きさは今の本番のまま送り先だけ替える(1344×768 は別の作業)。Windows の画像段は予備。B70 のワークフローは ARG に写し、正本は b70-box。forge-gen と ComfyUI を共用(順番待ち可)
+- 切り替え: `ARG_CONFIG=<yaml>` か `run_workflow_sync(config_overlay=<yaml>)` で config.yaml に重ねる。B70 の例は `config/b70.overlay.yaml`(width / height は本番に合わせて書き換える前提)、ワークフローは `config/workflow_b70_flux1_schnell_fp8.api.json`
+- ComfyUIClient: ノードは決め打ちの番号か class_type と配線で探す、history の subfolder / type、`comfyui.poll_interval_sec`(既定 2 秒)、`status_str: error` で止める
+- キャッシュのキーに種類・送り先・大きさ(localhost だけ前の形のファイルも見る)
+- テスト: `tests/test_comfyui_b70_022.py`(27 件)。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)
 
 ## 画像段で 1 場面あたり N 枚の候補と一覧画像を作る(ブリーフ 021)— 2026-11-04 時点
 - ブランチ `pm/021` に実装済み。main へは未マージ(PM が報告を見てから merge)。radio_director 側(run_remote.py)は次のジョブ。渡し方は `.pm/reports/021.md` の「未解決点」

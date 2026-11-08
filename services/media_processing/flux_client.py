@@ -69,6 +69,13 @@ class FluxClient:
         
         logger.info(f"FluxClient initialized: {self.base_url}")
     
+    def cache_identity(self) -> str:
+        """What makes an image of this backend differ for the same prompt and seed (022).
+
+        The configured size; a resolution fallback after a timeout is not part of it.
+        """
+        return f"forge|{str(self.base_url).rstrip('/')}|{self.width}x{self.height}"
+
     async def check_api_status(self) -> bool:
         """Check if Forge API is available
         
