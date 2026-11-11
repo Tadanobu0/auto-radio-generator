@@ -1,5 +1,11 @@
 # STATUS
 
+## サムネイル背景の自動プロンプトを「具体物＋題の余白」の形にする(ブリーフ 024)— 2026-11-11 時点
+- ブランチ `pm/024` に実装済み。main へは未マージ
+- `ThumbnailBackgroundGenerator.build_prompt` → 新しい `ImagePromptGenerator.generate_thumbnail_scene_prompt`。構図(正面の写実・具体物は右 3 分の 1・左 3 分の 2 は無地の面・人と文字なし)はコードで固定し、LLM は PLACE / OBJECTS / SURFACE の 3 行だけ書く。題・要約は日本語のまま渡す
+- 抽象画・人・文字の語を含む返答は 1 回やり直し、だめなら具体物の汎用の場面。旧 `generate_thumbnail_prompt` と場面画像のプロンプトは変えていない
+- テスト: `tests/test_thumbnail_scene_prompt_024.py`(23 件。パラメータ展開後)。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)。画像での確認もまだ
+
 ## B70 の overlay の scheduler を本番と同じ normal にする(ブリーフ 023)— 2026-11-08 時点
 - ブランチ `pm/023` に実装済み。main へは未マージ
 - `config/b70.overlay.yaml` は 768×432 / steps 4 / cfg 1 / euler / normal で本番と同じ。違うのは送り先(と poll 0.5 秒・timeout)だけ
