@@ -652,8 +652,11 @@ Generate the prompt now:"""
         topic_title: Optional[str] = None,
         visual_identity: Optional[VisualIdentity] = None
     ) -> str:
-        """Generate eye-catching thumbnail background prompt
-        
+        """Generate eye-catching thumbnail background prompt (abstract style)
+
+        No longer used by ThumbnailBackgroundGenerator.build_prompt, which calls
+        generate_thumbnail_scene_prompt (024); kept as it was.
+
         Args:
             theme: Video theme
             script_summary: Script summary (200-300 chars)
@@ -731,7 +734,198 @@ Create an ABSTRACT, ATMOSPHERIC, or METAPHORICAL background (NOT concrete object
             fallback = self._get_fallback_thumbnail_prompt(theme, identity)
             console.print(f"[yellow]Using fallback thumbnail prompt[/yellow]")
             return fallback
-    
+
+    # ------------------------------------------------------------------
+    # Thumbnail background as a concrete scene (024)
+    #
+    # The abstract prompt above (generate_thumbnail_prompt) gave abstract pictures of light
+    # webs, crystals and particles for every candidate in radio_director 080 / 081: its
+    # instructions ask for ABSTRACT / METAPHORICAL imagery with NO concrete objects, and a
+    # Japanese theme reached the LLM only as "abstract concept, modern technology, innovative
+    # ideas" (_extract_english_keywords keeps English words only). The prompts that passed on
+    # the first try were hand-written in one shape: a real place seen from the front, a few
+    # concrete objects in the right third, the left two thirds a plain wall for the title.
+    # Here code fixes that shape and the LLM writes only the place and the objects.
+    # ------------------------------------------------------------------
+
+    # Upper bound for one LLM-written part (place / objects / surface); keeps the whole
+    # prompt well under MAX_SEGMENT_PROMPT_CHARS (FLUX schnell's 256 T5 tokens).
+    THUMBNAIL_PART_MAX_CHARS = 240
+
+    # Words that pull FLUX toward the abstract pictures seen in 080 / 081, or toward people
+    # and writing. An LLM part with any of them is rejected (retry once, then the fallback).
+    _THUMBNAIL_BANNED_WORDS = re.compile(
+        r"\b(abstract\w*|metaphor\w*|particles?|crystal\w*|bokeh|gradients?|energy|aurora\w*|"
+        r"holo\w*|ethereal|cosmic|galax\w*|nebula\w*|fractal\w*|geometric|swirl\w*|"
+        r"light (?:web|net|network|trail|beam|pattern|streak)s?|"
+        r"(?:web|net|network|lattice|grid|mesh) of (?:light|lines)|glowing (?:lines|threads|strands|arcs)|"
+        r"person|people|human\w*|man|men|woman|women|child\w*|hands?|fingers?|faces?(?![\s-]+down\b)|silhouettes?|"
+        r"text|letters?|words?|logos?|brand\w*|signs?|signage|labels?)\b",
+        re.IGNORECASE,
+    )
+
+    THUMBNAIL_SCENE_SYSTEM_PROMPT = """You choose what a YouTube thumbnail background for a Japanese radio episode shows. The picture is a realistic photograph of a real place seen straight on from the front. A few concrete objects that stand for the episode's theme sit small in the right third of the frame; the left two thirds are a plain flat surface (a bare wall, or a clear sky outdoors) where the title is put later. The layout, the camera, the colors and the film look are added by code - you write only the three parts below.
+
+Write exactly three lines, in English, in this form:
+PLACE: <the everyday place where the theme happens, as a short noun phrase, e.g. "a dim bedroom at night">
+OBJECTS: <one to three concrete, everyday objects a viewer would link to the theme at a glance, with their size, material and how they stand, as one noun phrase, e.g. "a small wooden bedside table with one smartphone lying face down and a warm table lamp">
+SURFACE: <the plain flat surface that fills the left two thirds, with its color, e.g. "a bare dark indigo wall">
+
+RULES:
+- Objects only, in their ordinary place. Never a person or any part of a body
+- The objects must be the real things the episode is about, shown plainly - never a symbol, a metaphor, or a pattern of light, and never abstract art, light webs, crystals, particles, blurred light spots or a color gradient
+- Nothing with writing on it: devices lie face down or show plain matte surfaces; no books, papers, packages or signs
+- Never copy names, product names, figures or quotes from the episode
+- Each line under 35 words. No Japanese, no quotation marks, no other lines"""
+
+    async def generate_thumbnail_scene_prompt(
+        self,
+        theme: str,
+        script_summary: str,
+        topic_title: Optional[str] = None,
+        visual_identity: Optional[VisualIdentity] = None,
+    ) -> str:
+        """Thumbnail background prompt as a concrete scene with room for the title (024).
+
+        The fixed frame (front view of a real place, objects in the right third, plain left
+        two thirds, no people / writing, brand colors, film look) comes from code; the LLM
+        writes the place, the objects and the plain surface from the Japanese theme, title
+        and summary. A reply that cannot be parsed, is too long, or uses an abstract / people
+        / writing word is retried once with a note, then replaced by a generic concrete
+        scene (never the abstract fallback). The reasons go to self.warnings.
+        """
+        lines = [f"Theme: {theme or '(none)'}"]
+        if topic_title:
+            lines.append(f"Episode title: {topic_title}")
+        if script_summary:
+            lines.append(f"Episode summary: {script_summary[:300]}")
+        user_message = (
+            "\n".join(lines)
+            + "\n\nChoose the place and the objects for this episode's thumbnail background "
+            "and write the three lines now:"
+        )
+
+        logger.info(f"Generating thumbnail scene prompt for theme: {theme}")
+        console.print("[cyan]Generating thumbnail background prompt...[/cyan]")
+
+        reasons: list[str] = []
+        message = user_message
+        for attempt in range(2):
+            parts, reason = await self._ask_thumbnail_parts(message)
+            if parts is not None:
+                prompt = self._compose_thumbnail_prompt(*parts, visual_identity)
+                if len(prompt) <= self.MAX_SEGMENT_PROMPT_CHARS:
+                    if reasons:
+                        logger.warning(f"Thumbnail prompt accepted on retry after: {'; '.join(reasons)}")
+                    logger.info(f"Generated thumbnail prompt: {prompt[:100]}...")
+                    console.print(f"[dim]Thumbnail prompt: {prompt[:80]}...[/dim]")
+                    return prompt
+                reason = f"prompt too long ({len(prompt)} chars > {self.MAX_SEGMENT_PROMPT_CHARS})"
+            reasons.append(f"try {attempt + 1}: {reason}")
+            message = (
+                user_message
+                + f"\n\nCORRECTION:\nYour previous answer was rejected: {reason}. "
+                "Write the three lines again, following every rule."
+            )
+
+        warning = (
+            f"thumbnail background prompt fell back: {'; '.join(reasons)}; "
+            "used the generic concrete thumbnail scene"
+        )
+        logger.warning(warning)
+        if not isinstance(getattr(self, "warnings", None), list):
+            self.warnings = []
+        self.warnings.append(warning)
+        console.print("[yellow]Using fallback thumbnail prompt[/yellow]")
+        return self._get_fallback_thumbnail_scene_prompt(visual_identity)
+
+    async def _ask_thumbnail_parts(
+        self, user_message: str
+    ) -> tuple[Optional[tuple[str, str, str]], Optional[str]]:
+        """One LLM call: ((place, objects, surface), None) or (None, reason)."""
+        try:
+            response = await self._llm_port.generate(LLMRequest(
+                system_prompt=self.THUMBNAIL_SCENE_SYSTEM_PROMPT,
+                user_prompt=user_message,
+                model=self.model_name,
+                max_tokens=512,
+                temperature=0.7,
+                response_format="text",
+            ))
+            content = response.content or ""
+        except Exception as e:
+            logger.error(f"Thumbnail prompt generation failed: {e}")
+            return None, f"LLM call failed ({type(e).__name__}: {self._short(e)})"
+        return self._parse_thumbnail_parts(content)
+
+    def _parse_thumbnail_parts(
+        self, content: str
+    ) -> tuple[Optional[tuple[str, str, str]], Optional[str]]:
+        """PLACE / OBJECTS / SURFACE lines -> parts, or (None, reason). SURFACE may be missing."""
+        found: dict[str, str] = {}
+        for line in content.splitlines():
+            match = re.match(r"^\s*[*\-]*\s*(PLACE|OBJECTS|SURFACE)\s*\**\s*:(.*)$", line, re.IGNORECASE)
+            if match:
+                quotes = " \"'*`"
+                value = match.group(2).strip(quotes).rstrip(" .,").strip(quotes)
+                value = self._sanitize_prompt(value).rstrip(" .,") if value else value
+                if value:
+                    found[match.group(1).upper()] = value
+        missing = [key for key in ("PLACE", "OBJECTS") if key not in found]
+        if missing:
+            return None, f"reply without {' / '.join(missing)} line"
+        found.setdefault("SURFACE", "a bare plain wall in a dark muted color")
+        for key in ("PLACE", "OBJECTS", "SURFACE"):
+            value = found[key]
+            if len(value) > self.THUMBNAIL_PART_MAX_CHARS:
+                return None, f"{key} too long ({len(value)} chars > {self.THUMBNAIL_PART_MAX_CHARS})"
+            banned = self._THUMBNAIL_BANNED_WORDS.search(value)
+            if banned:
+                return None, f"{key} uses a word that is not allowed (\"{banned.group(0)}\")"
+        return (found["PLACE"], found["OBJECTS"], found["SURFACE"]), None
+
+    def _compose_thumbnail_prompt(
+        self,
+        place: str,
+        objects: str,
+        surface: str,
+        visual_identity: Optional[VisualIdentity] = None,
+    ) -> str:
+        """The fixed thumbnail frame around the LLM-written place / objects / surface (024).
+
+        The title is drawn later by ThumbnailGenerator, centered and up to 648 px wide on
+        1280x720 (x 316-964). The objects stay small near the right edge and the plain
+        surface covers the left two thirds including the center, the layout that passed in
+        080 / 081 under that title.
+        """
+        if visual_identity:
+            colors = f"{visual_identity.primary_color} and {visual_identity.secondary_color}"
+            aesthetic = f"{visual_identity.aesthetic} aesthetic"
+        else:
+            colors = f"{DEFAULT_PRIMARY_COLOR} and {DEFAULT_SECONDARY_COLOR}"
+            aesthetic = f"{DEFAULT_AESTHETIC} aesthetic"
+        return (
+            f"{self.SEGMENT_PROMPT_PREFIX}"
+            f"a realistic photograph of {place}, seen straight on from the front at eye level. "
+            f"In the right third of the frame, toward the right edge: {objects}, small, sharp and "
+            f"clearly recognizable, occupying only the right third. "
+            f"The left two thirds of the frame, including the center, is {surface}, completely "
+            f"flat, smooth and evenly lit, a wide empty area kept clear for a title. "
+            f"Quiet natural composition with soft {colors} tones in the light, {aesthetic}, "
+            f"shot on Kodak Portra 400 film, subtle film grain, highly detailed"
+        )
+
+    def _get_fallback_thumbnail_scene_prompt(
+        self, visual_identity: Optional[VisualIdentity] = None
+    ) -> str:
+        """Concrete thumbnail scene used when the LLM gives nothing usable (024)."""
+        return self._compose_thumbnail_prompt(
+            "a quiet living room in the evening",
+            "a small wooden side table with one warm table lamp and a ceramic mug",
+            "a bare dark indigo wall",
+            visual_identity,
+        )
+
     def _extract_english_keywords(self, text: str) -> str:
         """Extract English keywords from mixed Japanese/English text
         

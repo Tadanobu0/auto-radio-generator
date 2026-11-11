@@ -1,5 +1,11 @@
 # DECISIONS
 
+## 2026-11-11 サムネイル背景のプロンプトは構図をコードで固定し、LLM には場所・具体物・無地の面の 3 行だけを書かせる(ブリーフ 024)
+- 決定: `ImagePromptGenerator.generate_thumbnail_scene_prompt` を新設し、`ThumbnailBackgroundGenerator.build_prompt` をこちらに切り替える。固定文は場面画像と同じ前置き(人・手・顔・文字なし)+「正面からの写実的な写真・具体物は右 3 分の 1 の右端寄りに小さく・左 3 分の 2(中央を含む)は無地の平らな面で題のための余白」+ブランド色(neon lighting・キーワードは付けない)+フィルムの語。題・題名・要約は日本語のまま LLM に渡す。抽象画・人・文字の語(abstract / crystal / particle / light web / person / hand / logo / label 等。face down は可)を含む返答は 1 回やり直し、だめなら具体物の汎用の場面(居間のサイドテーブルとランプ)に落とす
+- 理由: 旧指示文が ABSTRACT・具体物なしを求め、日本語の題は `_extract_english_keywords` で "abstract concept, modern technology, innovative ideas" に置き換わり、080・081 とも LLM は同じ中身のない入力しか受けていなかった。合格した上書きは 2 回とも同じ型だった
+- 余白の位置: ARG の題は中央寄せ・幅最大 648px(x 316〜964)。合格した 080・081 の上書きは「右 3 分の 1 に物・左 3 分の 2 が余白」でこの題の下で通ったので、その型に合わせ、物は右端寄り・小さくと書く
+- 却下案: 旧メソッド `generate_thumbnail_prompt` を書き換える(既存テストが中身と抽象画のフォールバックを固定しており「テストは追加のみ」に反する。旧メソッドは残し呼ばれなくなるだけ)/ 余白を題の位置どおり中央に取り物を左右両端に置く(合格例と違う型で未検証)/ プロンプト全体を LLM に書かせて検査だけする(構図が LLM 任せに戻る)
+
 ## 2026-11-08 B70 の overlay の scheduler を本番と同じ normal にし、ワークフローの写しは simple のまま残す(ブリーフ 023)
 - 決定: `config/b70.overlay.yaml` の `comfyui.scheduler` を simple → normal(768×432・steps 4・cfg 1・euler は変えない)。`config/workflow_b70_flux1_schnell_fp8.api.json` の KSampler の scheduler(simple)は変えない
 - 理由: radio_director-078 で本番(Windows の ComfyUI)は euler / normal と確認。PM の方針は「送り先だけを替える」。ワークフローを読む経路は `ComfyUIClient.generate_image` だけで、送る前に必ず config の scheduler で書き換える(`ComfyUIConfig.scheduler` は既定 normal で必ず値がある)ので、写しの値は送られない

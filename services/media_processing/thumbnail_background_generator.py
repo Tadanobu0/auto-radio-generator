@@ -139,8 +139,12 @@ class ThumbnailBackgroundGenerator:
         visual_identity: Optional[VisualIdentity] = None,
         topic_title: Optional[str] = None,
     ) -> str:
-        """The thumbnail background prompt (made once for all candidates, 021)."""
-        return await self.prompt_generator.generate_thumbnail_prompt(
+        """The thumbnail background prompt (made once for all candidates, 021).
+
+        A concrete scene with the left two thirds kept plain for the title (024); the
+        former abstract prompt (generate_thumbnail_prompt) gave abstract pictures only.
+        """
+        return await self.prompt_generator.generate_thumbnail_scene_prompt(
             theme=theme,
             script_summary=script_summary,
             topic_title=topic_title,
