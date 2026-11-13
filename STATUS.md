@@ -1,5 +1,11 @@
 # STATUS
 
+## B70 の ComfyUI へ Flux を投げている送り主の調査(ブリーフ 025)— 2026-11-13 時点
+- 調査のみ(コード・設定の変更なし)。詳細は `.pm/reports/025.md`
+- 送り主は ARG の `ComfyUIClient.generate_image`(`config/b70.overlay.yaml` を重ねたとき。`ARG/flux1-schnell` は B70 用ワークフローの写しの filename_prefix)。ARG に起動のしかけは無く、呼ぶのは radio_director の画像段(images_only・candidates=9)
+- 3 回の枚数は 9 の倍数(180 / 135 / 153)。11/10 03時台 = 080、11/11 12時台 = 081 の画像段と時刻が合う。11/8 22時台は 022・023 の取り込み直後の B70 経路の通しとみられる(未確認)
+- 送り先は設定(overlay の base_url)で替えられる。軽いプロンプトでの確認・切れたときのやり直しは無い(失敗した候補は飛ばし、全部だめなら静止画)
+
 ## サムネイル背景の自動プロンプトを「具体物＋題の余白」の形にする(ブリーフ 024)— 2026-11-11 時点
 - ブランチ `pm/024` に実装済み。main へは未マージ
 - `ThumbnailBackgroundGenerator.build_prompt` → 新しい `ImagePromptGenerator.generate_thumbnail_scene_prompt`。構図(正面の写実・具体物は右 3 分の 1・左 3 分の 2 は無地の面・人と文字なし)はコードで固定し、LLM は PLACE / OBJECTS / SURFACE の 3 行だけ書く。題・要約は日本語のまま渡す
