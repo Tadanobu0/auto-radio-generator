@@ -1,5 +1,10 @@
 # DECISIONS
 
+## 2026-11-14 受付窓口向けは b70.overlay.yaml の写しに base_url だけ替えた別ファイルにする(ブリーフ 028)
+- 決定: `config/b70gate.overlay.yaml` を b70.overlay.yaml と同じキー・値で持ち、`comfyui.base_url` だけ `http://192.168.0.86:8188`(b70-gate)。切り替えは radio_director の `config_overlay` の 1 か所(PM 了承 11/14、報告 027 の案 1)
+- 理由: 重ねられる overlay は 1 本だけ(`resolve_config_overlay`)なので、base_url だけの小さな yaml では B70 用の workflow・大きさが乗らない。値の食い違いは `tests/test_b70gate_overlay_028.py` で検出する
+- 却下案: overlay を複数重ねられるようにコードを変える(本番へ配るジョブでコードに触らない方針に反する)/ b70.overlay.yaml の base_url を書き換える(切り替えの日まで今の動きを変えない方針に反する)
+
 ## 2026-11-11 サムネイル背景のプロンプトは構図をコードで固定し、LLM には場所・具体物・無地の面の 3 行だけを書かせる(ブリーフ 024)
 - 決定: `ImagePromptGenerator.generate_thumbnail_scene_prompt` を新設し、`ThumbnailBackgroundGenerator.build_prompt` をこちらに切り替える。固定文は場面画像と同じ前置き(人・手・顔・文字なし)+「正面からの写実的な写真・具体物は右 3 分の 1 の右端寄りに小さく・左 3 分の 2(中央を含む)は無地の平らな面で題のための余白」+ブランド色(neon lighting・キーワードは付けない)+フィルムの語。題・題名・要約は日本語のまま LLM に渡す。抽象画・人・文字の語(abstract / crystal / particle / light web / person / hand / logo / label 等。face down は可)を含む返答は 1 回やり直し、だめなら具体物の汎用の場面(居間のサイドテーブルとランプ)に落とす
 - 理由: 旧指示文が ABSTRACT・具体物なしを求め、日本語の題は `_extract_english_keywords` で "abstract concept, modern technology, innovative ideas" に置き換わり、080・081 とも LLM は同じ中身のない入力しか受けていなかった。合格した上書きは 2 回とも同じ型だった
