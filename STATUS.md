@@ -1,5 +1,11 @@
 # STATUS
 
+## 受付窓口(b70-gate)向けの overlay を足す(ブリーフ 028)— 2026-11-14 時点
+- ブランチ `pm/028` に実装済み。main へは未マージ
+- `config/b70gate.overlay.yaml` を新規。中身は `config/b70.overlay.yaml` と同じで `comfyui.base_url` だけ `http://192.168.0.86:8188`(窓口)。誰かが引数か `ARG_CONFIG` で渡すまで読まれない。既存ファイル・コードは変えていない
+- 切り替えの日は radio_director の `config_overlay` を `config/b70gate.overlay.yaml` に変える 1 か所だけ
+- テスト: `tests/test_b70gate_overlay_028.py`(1 件)。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)
+
 ## ComfyUI へ投げる本文の extra_data に sender を入れる(ブリーフ 026)— 2026-11-14 時点
 - ブランチ `pm/026` に実装済み。main へは未マージ
 - `ComfyUIClient.generate_image` の `POST /prompt` の本文に `extra_data.sender = "radio"`(固定)。投げ先・待ち方・時間切れ・出力は変えていない

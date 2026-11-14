@@ -1,0 +1,24 @@
+# 受付窓口 b70-gate 向けに config.yaml へ重ねる設定 (ブリーフ 028)
+#
+# 受付窓口 b70-gate 向け。窓口が常駐になってから radio_director が渡す。窓口がモデルの持ち替えを受け持つ。
+#
+# 使い方: run_workflow_sync(..., config_overlay="config/b70gate.overlay.yaml")
+#         (または環境変数 ARG_CONFIG=config/b70gate.overlay.yaml。相対パスは ARG の直下から)
+# 引数か環境変数で渡すまで、どこからも読まれない。
+#
+# 中身は config/b70.overlay.yaml と同じで、comfyui.base_url だけ窓口に向ける
+# (tests/test_b70gate_overlay_028.py で確かめている。b70.overlay.yaml を変えたらこちらも揃える)。
+
+image_provider: "comfyui"
+
+comfyui:
+  base_url: "http://192.168.0.86:8188"   # 受付窓口 b70-gate(Mac Studio の有線の IP・b70-gate のポート)
+  workflow_path: "config/workflow_b70_flux1_schnell_fp8.api.json"
+  timeout: 600            # キューで forge-gen の後ろに並ぶ分も含めた 1 枚の上限(秒)
+  poll_interval_sec: 0.5  # B70 は 1 枚が数秒なので細かく見る
+  width: 768              # ← 本番に合わせる
+  height: 432             # ← 本番に合わせる
+  steps: 4
+  cfg: 1.0
+  sampler_name: "euler"
+  scheduler: "normal"     # 本番(Windows の ComfyUI、ARG の既定 normal)に合わせた
