@@ -1,5 +1,10 @@
 # STATUS
 
+## ComfyUI へ投げる本文の extra_data に sender を入れる(ブリーフ 026)— 2026-11-14 時点
+- ブランチ `pm/026` に実装済み。main へは未マージ
+- `ComfyUIClient.generate_image` の `POST /prompt` の本文に `extra_data.sender = "radio"`(固定)。投げ先・待ち方・時間切れ・出力は変えていない
+- テスト: `tests/test_comfyui_b70_022.py::test_sender_is_in_extra_data` を追加。このジョブではテストのコマンドが許可されず**未実行**(merge 前に PM が Mac で流す)
+
 ## B70 の ComfyUI へ Flux を投げている送り主の調査(ブリーフ 025)— 2026-11-13 時点
 - 調査のみ(コード・設定の変更なし)。詳細は `.pm/reports/025.md`
 - 送り主は ARG の `ComfyUIClient.generate_image`(`config/b70.overlay.yaml` を重ねたとき。`ARG/flux1-schnell` は B70 用ワークフローの写しの filename_prefix)。ARG に起動のしかけは無く、呼ぶのは radio_director の画像段(images_only・candidates=9)

@@ -284,6 +284,8 @@ class ComfyUIClient:
             async with httpx.AsyncClient(timeout=timeout_config) as client:
                 # Step 1: POST /prompt to submit workflow
                 prompt_payload = {"prompt": workflow}
+                # Sender name for the shared b70 ComfyUI queue / history (and b70-gate): 026
+                prompt_payload.setdefault("extra_data", {})["sender"] = "radio"
                 response = await client.post(
                     f"{self.base_url}/prompt",
                     json=prompt_payload
