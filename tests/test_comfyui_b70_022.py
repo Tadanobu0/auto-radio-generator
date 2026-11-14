@@ -217,6 +217,14 @@ def test_generate_image_against_b70(fake_comfy, tmp_path):
     assert client.workflow["6"]["inputs"]["text"] == ""
 
 
+def test_sender_is_in_extra_data(fake_comfy, tmp_path):
+    # 026: 共有の ComfyUI の列・history で送り主が分かるように
+    asyncio.run(_client().generate_image(prompt="p", output_path=tmp_path / "a.png"))
+    body = fake_comfy.submitted[0]
+    assert body["extra_data"] == {"sender": "radio"}
+    assert set(body) == {"prompt", "extra_data"}
+
+
 def test_random_seed_when_not_given(fake_comfy, tmp_path):
     _, metadata = asyncio.run(_client().generate_image(prompt="p", output_path=tmp_path / "a.png"))
     seed = fake_comfy.submitted[0]["prompt"]["3"]["inputs"]["seed"]
